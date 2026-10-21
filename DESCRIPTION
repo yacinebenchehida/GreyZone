@@ -1,0 +1,37 @@
+Package: lagpower
+Type: Package
+Title: Genetic Lag Time and Power to Detect Population Differentiation
+Version: 0.0.1
+Authors@R: c(
+    person("Yacine", "Ben Chehida", email = "yacine.benchehida@nhm.ac.uk",
+           role = c("aut", "cre")),
+    person("Anna", "Schleimer", role = "aut"),
+    person("Xenia", "Moreira Lopez", role = "aut"))
+Description: Simulates the split of one ancestral population into two daughter
+    populations, with genetic drift, gene flow and mutation, and estimates how
+    many generations must pass before the split becomes statistically
+    detectable with a given set of markers and samples (the "grey zone" of
+    differentiation; Bailleul et al. 2018 <doi:10.1111/eva.12591>; Ben Chehida
+    et al. 2020 <doi:10.1038/s41437-019-0284-1>; Schleimer et al. 2024
+    <doi:10.1111/icad.12725>). It helps decide whether an absence of genetic
+    structure reflects a genetic lag-time effect, a lack of statistical power,
+    or genuine connectivity. The simulation engine is written in C++ (Rcpp)
+    and follows allele frequencies, so very large effective sizes are cheap.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: false
+Imports:
+    Rcpp (>= 1.0.0),
+    graphics,
+    grDevices,
+    stats
+LinkingTo:
+    Rcpp
+Suggests:
+    adegenet,
+    vcfR,
+    shiny,
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.1
