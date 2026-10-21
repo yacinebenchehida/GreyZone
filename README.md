@@ -1,4 +1,4 @@
-# GreyZone packag
+# GreyZone package
 
 **Genetic lag time and power to detect population differentiation**
 
