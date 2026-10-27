@@ -1,8 +1,10 @@
 # GreyZone animation
 
-## [▶ Open animation](https://yacinebenchehida.github.io/GreyZone/)
+## [▶ Essai de nage des poissons](https://yacinebenchehida.github.io/GreyZone/fish-study.html)
 
-Click the link above to see and play the animation in your browser.
+A small visual study: four stylised surgeonfish seen from above, with a solo view, pause and three swimming speeds. This is the first step toward replacing the whale scene. [Movement and appearance notes](FISH_STUDY.md).
+
+## [▶ Open the population-genetics animation](https://yacinebenchehida.github.io/GreyZone/)
 
 Raise the barrier, press **Play**, then **Take a genetic sample**. You can change population sizes, the split ratio, migration, sample size and marker count.
 
