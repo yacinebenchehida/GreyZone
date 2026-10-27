@@ -6,7 +6,7 @@ const TAU=Math.PI*2,clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 class OceanScene{
   constructor(canvas){this.canvas=canvas;this.c=canvas.getContext('2d');this.w=1000;this.h=540;this.clock=0;this.last=0;this.wasSplit=false;this.raised=0;this.selected=-1;this.hover=-1;this.reduced=matchMedia('(prefers-reduced-motion: reduce)');canvas.addEventListener('pointermove',e=>{const b=canvas.getBoundingClientRect(),x=e.clientX-b.left,y=e.clientY-b.top;let best=34;this.hover=-1;for(const a of this.animals||[]){const d=Math.hypot(a.x*this.w-x,a.y*this.h-y);if(d<best){best=d;this.hover=a.id;}}canvas.style.cursor=this.hover<0?'default':'pointer';});canvas.addEventListener('pointerleave',()=>{this.hover=-1;});canvas.addEventListener('click',()=>{this.selected=this.selected===this.hover?-1:this.hover;});}
   reset(settings){
-    this.settings=settings;this.random=GreyModel.rng(settings.displaySeed??8102);this.wasSplit=false;this.raised=0;this.selected=-1;this.clock=0;this.last=0;this.migrationBudget=0;this.migrationStarts=0;this.nextMigration=0;this.markerCache=null;this.markerReferences=[];this.frozenKey=null;
+    this.settings=settings;this.random=GreyModel.rng(settings.displaySeed??8102);this.wasSplit=false;this.raised=0;this.selected=-1;this.clock=0;this.last=0;this.migrationBudget=0;this.migrationStarts=0;this.nextMigration=0;this.markerCache=null;this.frozenKey=null;
     this.travelPace=this.travelPace||1.3;
     this.display=GreyDisplay.summary(settings);
     const r=this.random,n=this.display.total,left=this.display.west;
@@ -101,7 +101,7 @@ class OceanScene{
     const old=this.markerCache;
     if(old&&old.generation===state.generation&&old.p1===state.p1&&old.p2===state.p2)return;
     const indices=GreyDisplay.markerIndices(state.p1.length);
-    this.markerCache={generation:state.generation,p1:state.p1,p2:state.p2,indices,palettes:GreyDisplay.markerPalettes([state.p1,state.p2],indices,this.markerReferences),data:GreyDisplay.markers(this.animals,[state.p1,state.p2],indices,this.settings.displaySeed||0)};
+    this.markerCache={generation:state.generation,p1:state.p1,p2:state.p2,indices,palettes:GreyDisplay.markerPalettes([state.p1,state.p2],indices),data:GreyDisplay.markers(this.animals,[state.p1,state.p2],indices,this.settings.displaySeed||0)};
   }
   markerCopies(a){return this.markerCache.data.get(a.id);}
   drawShark(a,state){
