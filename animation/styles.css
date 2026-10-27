@@ -17,3 +17,6 @@ header,main,footer{max-width:1520px}.intro{padding:32px 0 28px}h1{font-size:62px
 .live-fst-heading{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:#31575c}.power-figure .chart{margin-top:0}.power-figure{min-width:0}
 
 .power-key.grey{height:9px;background:#e0dfd3;border:1px solid #cccbbd}
+
+/* The generation count is the primary scientific result. */
+.duration-number{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}.duration-number .power-time{font-size:clamp(76px,8vw,126px);font-variant-numeric:tabular-nums;line-height:1;letter-spacing:-3px}.duration-number .power-time.small{font-size:clamp(29px,3.5vw,45px);letter-spacing:-1px}.power-unit{font:24px Georgia,serif;color:#31575c}.power-status{font-size:13px;font-weight:600;color:#32746b;margin:16px 0 0}.duration-label{display:block;font-size:9px;letter-spacing:1.4px;color:#577d73;margin-bottom:3px}.detection-summary #power-scene-time{display:block;font:32px/1.2 Georgia,serif;color:#214f54}.detection-summary{align-items:center}.power-answer{align-self:start;padding-top:35px}.playbar button[aria-pressed=true]{background:#dbe5dc;border-color:#78998d}.power-unit[hidden]{display:none}@media(max-width:720px){.duration-number .power-time{font-size:80px}.power-answer{padding-top:0}.power-unit{font-size:21px}.detection-summary #power-scene-time{font-size:27px}}

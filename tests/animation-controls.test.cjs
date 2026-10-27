@@ -35,7 +35,7 @@ test('Pause freezes generations, shark motion, body waves and the ocean clock; P
   a.tick(10);assert(a.state().clock>initial.clock,'The introductory sea should still swim');
   a.click('split');a.tick(60);
   assert.equal(a.element('play').textContent,'Pause');assert(Number(a.state().generation)>0);
-  a.click('play');assert.equal(a.element('play').textContent,'Play');
+  a.click('play');assert.equal(a.element('play').textContent,'Resume');
   const paused=a.state();a.tick(600);
   assert.deepEqual(a.state(),paused,'Both simulation and decorative clocks must stay frozen');
   // Inspecting or sampling the paused scene must not restart it.
@@ -47,7 +47,7 @@ test('Pause freezes generations, shark motion, body waves and the ocean clock; P
 
 test('single-step stays paused, a hidden tab pauses both clocks, and Reset restores the introductory swimming scene',()=>{
   const a=app();a.tick();a.click('split');a.tick(60);
-  a.click('step');const stepped=a.state();assert.equal(a.element('play').textContent,'Play');
+  a.click('step');const stepped=a.state();assert.equal(a.element('play').textContent,'Resume');
   a.tick(60);assert.deepEqual(a.state(),stepped);
   a.click('step');assert.equal(Number(a.state().generation),Number(stepped.generation)+1);
   assert.equal(a.state().animals,stepped.animals);
@@ -63,17 +63,18 @@ test('live power follows the clock, stays running after detection and reruns hav
   assert.equal(w.request.type,'init');assert.equal(typeof w.request.seed,'number');
   a.click('step');assert.equal(w.request.type,'advance');assert.equal(w.request.generation,1);
   w.onmessage({data:{id,max:1,points:[{t:0,power:.05,hits:4},{t:1,power:.6,hits:48}]}});
-  assert.equal(a.element('power-time').textContent,'Still in the grey zone');
+  assert.equal(a.element('power-time').textContent,'Not reached yet');
+  a.click('step');
   w.onmessage({data:{id,max:2,points:[{t:0,power:.05,hits:4},{t:1,power:.6,hits:48},{t:2,power:.85,hits:68}]}});
-  assert.equal(a.element('power-time').textContent,'80% detection reached');assert(!w.terminated);
+  assert.equal(a.element('power-time').textContent,'2');assert.equal(a.element('power-unit').hidden,false);assert.match(a.element('power-scene-time').textContent,/2 generations/);assert(!w.terminated);
   const seed=a.workers[0].initialRequest.seed;a.click('split');assert.notEqual(a.workers[1].request.seed,seed);
 });
 test('the result-panel pause controls the live simulation, stale batches cannot update a rerun',()=>{
   const a=app();a.click('split');const old=a.workers[0],id=old.request.id;a.click('calculate-power');
-  assert.equal(a.element('calculate-power').textContent,'Continue simulation');const g=a.state().generation;a.tick(30);assert.equal(a.state().generation,g);
+  assert.equal(a.element('calculate-power').textContent,'Resume simulation');const g=a.state().generation;a.tick(30);assert.equal(a.state().generation,g);
   a.click('calculate-power');assert.equal(a.element('calculate-power').textContent,'Pause simulation');
   a.click('split');old.onmessage({data:{id,max:1,points:[{t:0,power:.05},{t:1,power:1}]}});
-  assert.notEqual(a.element('power-time').textContent,'80% detection reached');
+  assert.notEqual(a.element('power-time').textContent,'1');
 });
 
 test('a ten-individual 10:90 split caps the sample at one without an invalid slider range',()=>{
@@ -86,7 +87,9 @@ test('a ten-individual 10:90 split caps the sample at one without an invalid sli
 test('isolated 100-individual live history fixes the ten displayed SNPs and keeps genotype colours uniform',()=>{
   const a=app({total:100,loci:50,'sample-size':20});a.click('split');
   // Use the actual +1 handler to advance the real model without expensive decorative frames.
+  const draw=a.scene.draw;a.scene.draw=()=>{};
   for(let i=0;i<1600;i++)a.click('step');
+  a.scene.draw=draw;
   a.element('show-markers').checked=true;a.tick();
   assert.match(a.element('sorting-status').textContent,/Fixed on both sides: 50\/50/);
   assert.equal(a.element('fst-value').textContent,'FST 1.0000');
@@ -95,4 +98,18 @@ test('isolated 100-individual live history fixes the ten displayed SNPs and keep
     const sharks=a.scene.animals.filter(x=>x.side===side),expected=cache.data.get(sharks[0].id)[dot][0];
     for(const shark of sharks)assert(cache.data.get(shark.id)[dot].every(copy=>copy===expected));
   }
+});
+
+
+test('Pause freezes queued power results and both charts; Resume applies them without changing the crossing number',()=>{
+  const a=app({total:100});a.click('split');const w=a.workers[0],id=w.initialRequest.id;
+  a.tick(30);a.click('play');assert.equal(w.request.type,'pause');
+  const before={title:a.element('power-time').textContent,curve:a.element('power-chart').innerHTML,now:a.element('power-now').textContent,fst:a.element('fst-chart').innerHTML};
+  w.onmessage({data:{id,max:2,points:[{t:0,power:.05,hits:4},{t:1,power:.65,hits:52},{t:2,power:.9,hits:72}]}});
+  a.tick(60);
+  assert.deepEqual({title:a.element('power-time').textContent,curve:a.element('power-chart').innerHTML,now:a.element('power-now').textContent,fst:a.element('fst-chart').innerHTML},before);
+  a.click('play');assert.equal(w.request.type,'resume');assert.equal(a.element('power-time').textContent,'2');
+  a.tick(30);a.click('calculate-power');assert.equal(w.request.type,'pause');
+  assert.equal(a.element('power-time').textContent,'2');assert.equal(a.element('power-unit').hidden,false);
+  const paused=a.state();a.tick(60);assert.deepEqual(a.state(),paused);
 });
