@@ -50,7 +50,7 @@ test('reduced motion places the split representatives in their basins without an
 });
 
 
-test('normal travel covers at least 14% of the open-water width per second, with a faster option',()=>{
+test('normal travel covers at least 8% of the open-water width per second, with a faster option',()=>{
   function distance(pace){
     const s=scene(),a=s.animals[0];s.animals=[a];s.travelPace=pace;
     a.settle=null;a.x=.15;a.y=.5;a.heading=0;a.speed=.05;
@@ -59,8 +59,8 @@ test('normal travel covers at least 14% of the open-water width per second, with
     for(let i=0;i<60;i++){s.clock+=1/60;s.update(1/60,{split:false,migrants:0});}
     return (a.x*s.w-start)/s.w;
   }
-  const normal=distance(3),fast=distance(4.5);
-  assert(normal>=.14);assert(fast>normal*1.45);
+  const normal=distance(1.75),fast=distance(3);
+  assert(normal>=.08);assert(fast>normal*1.65);
 });
 
 test('the scene creates the requested scaled headcount and split, and starts more exchanges at higher migration',()=>{
@@ -81,4 +81,10 @@ test('the scene creates the requested scaled headcount and split, and starts mor
   const stopped=s.migrationStarts;
   for(let frame=0;frame<100;frame++){s.clock+=.05;s.update(.05,{split:true,migrants:20,generationRate:0});}
   assert.equal(s.migrationStarts,stopped,'Stopped generation playback must not launch new migrants');
+});
+
+
+test('high migration widens the channel modestly without changing its centre',()=>{
+  const s=scene();s.settings.migrants=1;const low=s.gap();s.settings.migrants=20;const high=s.gap();
+  assert.equal(low.y,high.y);assert(high.half>low.half);assert(high.half<=s.h*.075+1e-9);
 });

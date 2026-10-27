@@ -7,7 +7,7 @@ class OceanScene{
   constructor(canvas){this.canvas=canvas;this.c=canvas.getContext('2d');this.w=1000;this.h=540;this.clock=0;this.last=0;this.wasSplit=false;this.raised=0;this.selected=-1;this.hover=-1;this.reduced=matchMedia('(prefers-reduced-motion: reduce)');canvas.addEventListener('pointermove',e=>{const b=canvas.getBoundingClientRect(),x=e.clientX-b.left,y=e.clientY-b.top;let best=34;this.hover=-1;for(const a of this.animals||[]){const d=Math.hypot(a.x*this.w-x,a.y*this.h-y);if(d<best){best=d;this.hover=a.id;}}canvas.style.cursor=this.hover<0?'default':'pointer';});canvas.addEventListener('pointerleave',()=>{this.hover=-1;});canvas.addEventListener('click',()=>{this.selected=this.selected===this.hover?-1:this.hover;});}
   reset(settings){
     this.settings=settings;this.random=GreyModel.rng(8102);this.wasSplit=false;this.raised=0;this.selected=-1;this.clock=0;this.last=0;this.migrationBudget=0;this.migrationStarts=0;this.markerCache=null;this.frozenKey=null;
-    this.travelPace=this.travelPace||3;
+    this.travelPace=this.travelPace||1.75;
     this.display=GreyDisplay.summary(settings);
     const r=this.random,n=this.display.total,left=this.display.west;
     this.animals=Array.from({length:n},(_,i)=>{
@@ -20,7 +20,7 @@ class OceanScene{
   }
   resize(){const b=this.canvas.getBoundingClientRect();this.w=b.width||1000;this.h=b.height||540;this.dpr=Math.min(2,devicePixelRatio||1);this.canvas.width=Math.round(this.w*this.dpr);this.canvas.height=Math.round(this.h*this.dpr);this.c.setTransform(this.dpr,0,0,this.dpr,0,0);this.makeWater();}
   coast(y,growth=1){const f=y/this.h;return {x:this.w*(.5+.027*Math.sin(f*5.6-.8)+.016*Math.sin(f*12+1)),half:this.w*(.043+.018*Math.sin(f*7+.3)**2+.018*Math.exp(-(((f-.27)/.17)**2)))*growth};}
-  gap(){return {y:this.h*.565,half:this.h*.053};}
+  gap(){const nm=this.settings.migrants||0;return {y:this.h*.565,half:this.h*(.053+.022*Math.min(1,Math.log1p(nm)/Math.log(21)))};}
   landPath(c,y0,y1,growth,pad=0){const pts=[];for(let y=y0;y<=y1;y+=5)pts.push(y);pts.push(y1);c.beginPath();for(let i=0;i<pts.length;i++){const y=pts[i],b=this.coast(y,growth),jag=Math.sin(y*.071)*2+Math.cos(y*.123)*1.3,x=b.x-b.half-pad+jag*growth;i?c.lineTo(x,y):c.moveTo(x,y);}for(let i=pts.length-1;i>=0;i--){const y=pts[i],b=this.coast(y,growth),jag=Math.cos(y*.064)*2+Math.sin(y*.147)*1.5;c.lineTo(b.x+b.half+pad+jag*growth,y);}c.closePath();}
   makeWater(){const bg=document.createElement('canvas');bg.width=this.w;bg.height=this.h;const c=bg.getContext('2d'),w=this.w,h=this.h,g=c.createLinearGradient(0,0,w,h);g.addColorStop(0,'#217f94');g.addColorStop(.38,'#4bb7b5');g.addColorStop(.7,'#36a9b1');g.addColorStop(1,'#146a8d');c.fillStyle=g;c.fillRect(0,0,w,h);for(const [x,y,r,col] of [[.14,.23,.55,'#b5e4c733'],[.74,.68,.48,'#97d8c333'],[.95,.03,.35,'#14718b33'],[.2,.95,.3,'#1b778d33']]){const a=c.createRadialGradient(w*x,h*y,0,w*x,h*y,w*r);a.addColorStop(0,col);a.addColorStop(1,'#16889900');c.fillStyle=a;c.fillRect(0,0,w,h);}const random=GreyModel.rng(7721);for(let i=0;i<1350;i++){const x=random()*w,y=random()*h;c.strokeStyle=i%4?'#8ddbd30c':'#031f4211';c.lineWidth=.6+random();c.beginPath();c.moveTo(x,y);c.quadraticCurveTo(x+7,y-2,x+10+random()*22,y+random()*3);c.stroke();}this.water=bg;}
   assignSides(){

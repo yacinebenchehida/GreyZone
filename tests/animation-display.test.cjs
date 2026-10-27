@@ -10,14 +10,14 @@ const M=world.GreyModel,D=world.GreyDisplay;
 test('headcounts are exact up to 200, then increase gently while preserving the split ratio',()=>{
   for(let n=1;n<=200;n++)assert.equal(D.count(n),n);
   let previous=200;
-  for(const total of [201,1000,4000,20000,100000]){
+  for(const total of [201,1000,5000,20000,100000,500000]){
     assert(D.count(total)>=previous&&D.count(total)<total);previous=D.count(total);
     for(const ratio of [10,30,50,90]){
       const d=D.summary({total,ratio});assert.equal(d.west+d.east,d.total);
       assert(Math.abs(d.west/d.total-ratio/100)<=.5/d.total+1e-12);
     }
   }
-  assert(D.count(100000)<400,'The largest current setting must remain practical to draw');
+  assert(D.count(500000)<450,'The largest current setting must remain practical to draw');
 });
 
 test('each animal has one diploid dot per displayed SNP, capped at ten; fixed alleles and current frequencies are retained',()=>{
