@@ -12,7 +12,7 @@ The ocean uses a top view with twenty-four representative grey sharks, with a ch
 
 Sharks choose random destinations across the available water, with smooth steering, boundary anticipation and local spacing. There is no circular route or force attracting them to a basin centre. Before the split, they share a single swimming area. When the barrier rises, representatives settle on the chosen sides, with counts approximating the split ratio. The sandy landmass and coconut palm remain part of the scene. With positive migration, paired illustrative crossings use the channel; their timing and count are not the numerical migrants per generation. A closed barrier prevents subsequent crossings. The population-genetics model is independent of these decorative positions.
 
-Travel speed controls displacement through the water independently of the body-wave cadence. Animal switches the illustration without changing or resetting the experiment. The Generations control sets the numerical simulation playback rate. Shark close-up or clicking a shark shows the same character at a larger size. Reduced-motion preferences suppress swimming and animated water, and place sharks on the selected sides without a moving split transition.
+Travel speed controls displacement through the water independently of the body-wave cadence. Animal switches the illustration without changing or resetting the experiment. The Generations control sets the numerical simulation playback rate. Pause freezes the generations and the ocean clock together, including shark travel, body waves, crossings and water effects. Play resumes from the frozen state without replaying elapsed wall time; +1 generation leaves the scene paused. Shark close-up or clicking a shark shows the same character at a larger size. Reduced-motion preferences suppress swimming and animated water, and place sharks on the selected sides without a moving split transition.
 
 Gene-copy dots are hidden by default. The optional “Show gene copies” overlay depicts two copies of the current first SNP; the statistical test uses all selected SNPs. Each dot is a gene copy, and its colour identifies the allele at that marker.
 
@@ -20,7 +20,7 @@ After changing browser source files, run `python3 scripts/sync_animation_docs.py
 
 ## Checks
 
-From the GreyZone repository root: `node --test tests/animation-model.test.cjs tests/animation-movement.test.cjs tests/shark-motion.test.cjs`.
+From the GreyZone repository root: `node --test tests/animation-model.test.cjs tests/animation-movement.test.cjs tests/shark-motion.test.cjs tests/animation-controls.test.cjs`.
 
 Checks cover binomial moments, diploid drift variance and diversity loss, initial equality at unequal split ratios, conservation of total population size, boundary behavior, migration, chi-square tails, null calibration for the default design, and independent sampling.
 

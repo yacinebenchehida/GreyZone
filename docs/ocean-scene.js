@@ -109,7 +109,7 @@ class OceanScene{
     c.fillStyle='#72877f';c.font='10px Arial, sans-serif';c.fillText(state.markers?'Two copies of one neutral marker':'Click the shark again to close',x,y+h-14);c.restore();
   }
 
-  draw(state){const now=performance.now()/1000,dt=this.last?Math.min(.05,now-this.last):0;this.last=now;if(!this.animals)return;if(!this.reduced.matches)this.clock+=dt;if(state.split&&!this.wasSplit){this.raised=this.clock;this.assignSides();}if(!state.split)this.raised=0;this.wasSplit=state.split;this.update(dt,state);this.c.clearRect(0,0,this.w,this.h);this.drawWater();for(const a of this.animals)this.drawShark(a,state);if(state.split){const t=this.reduced.matches?1:clamp((this.clock-this.raised)/1.7,0,1),growth=1-(1-t)**3;this.drawLand(state,growth);}const selected=this.animals.find(a=>a.id===this.selected);if(selected)this.drawPortrait(selected,state);}
+  draw(state){const now=performance.now()/1000,dt=this.last?Math.min(.05,now-this.last):0;this.last=now;if(!this.animals)return;if(!this.reduced.matches&&!state.paused)this.clock+=dt;if(state.split&&!this.wasSplit){this.raised=this.clock;this.assignSides();}if(!state.split)this.raised=0;this.wasSplit=state.split;if(!state.paused)this.update(dt,state);this.c.clearRect(0,0,this.w,this.h);this.drawWater();for(const a of this.animals)this.drawShark(a,state);if(state.split){const t=this.reduced.matches?1:clamp((this.clock-this.raised)/1.7,0,1),growth=1-(1-t)**3;this.drawLand(state,growth);}const selected=this.animals.find(a=>a.id===this.selected);if(selected)this.drawPortrait(selected,state);}
 
 }
 root.OceanScene=OceanScene;
