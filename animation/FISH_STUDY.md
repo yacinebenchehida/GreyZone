@@ -10,4 +10,4 @@ The first character is a stylised blue surgeonfish with a yellow forked tail, se
 
 `fish-study.js` supplies four offset paths around a broad oval, with small phase differences in tail beats. Curvature anticipates the turn and bends the body. The coordinated paths are a visual swimming test, not an emergent schooling model. The fish are underwater throughout; no surface masking or foam is applied. Soft seabed shadows and small moving highlights suggest water depth.
 
-Pause freezes the route, body motion and water effects. Reduced-motion preferences start the page paused. The solo view enlarges one character, and the speed selector changes the movement rate. The population-genetics model and the earlier animation are unchanged by this study.
+Pause freezes the route, body motion and water effects. Reduced-motion preferences start the page paused. The solo view enlarges one character, and the Travel speed selector changes progression along the swimming route independently of the body-wave cadence and water effects. The route covers most of the pool while leaving room to turn. The population-genetics model and the earlier animation are unchanged by this study.
