@@ -33,7 +33,7 @@ Background: Bailleul et al. (2018), doi:10.1111/eva.12591; Ben Chehida et al. (2
 
 Movement checks cover closed-barrier containment, positive-migration channel crossings, use of twelve regions in each basin, independent travel and body-wave cadence, and reduced-motion placement.
 
-Body-aware margins keep the shark and tail inside the available water. Movement checks also verify that normal straight travel covers at least 14% of the open-water width per second, with a faster option.
+Body-aware margins keep the shark and tail inside the available water. Movement checks also verify that normal straight travel covers at least 8% of the open-water width per second, with a faster option.
 
 Display checks cover exact small-population headcounts, proportional splits, bounded large-population counts, quantitative migration response, the ten-SNP cap, diploid dots, fixed alleles and agreement between illustrated and numerical allele frequencies.
 
