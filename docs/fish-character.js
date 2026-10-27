@@ -3,7 +3,7 @@
 (function(root){
 'use strict';
 const TAU=Math.PI*2;
-const profiles={surgeon:{body:'#237ac8',light:'#73d7ed',edge:'#123b73',ink:'#173f71',tail:'#f4d45a',fin:'#85dbe1',width:1}};
+const profiles={surgeon:{body:'#237ac8',light:'#73d7ed',edge:'#123b73',ink:'#173f71',tail:'#237ac8',fin:'#237ac8',width:1}};
 const defaultWidths=[2,6.4,10.4,13.1,14.2,14,12.9,11.1,9.0,6.9,5.1,3.6,2.5,1.7,1.3,1.1];
 function path(c,pts,close=true){c.beginPath();c.moveTo(pts[0].x,pts[0].y);for(let i=1;i<pts.length;i++)c.lineTo(pts[i].x,pts[i].y);if(close)c.closePath();}
 function ellipse(c,x,y,rx,ry,col){c.fillStyle=col;c.beginPath();c.ellipse(x,y,rx,ry,0,0,TAU);c.fill();}
@@ -24,19 +24,19 @@ function draw(c,fish,time,options={}){
   for(const side of [-1,1]){
     const p=basis(.29),beat=Math.sin(phase*.53+side*.65);
     c.save();c.translate(p.x,p.y);c.rotate(p.a);c.scale(1,side);
-    c.rotate(beat*.10);c.fillStyle='#65bfc77a';c.strokeStyle='#b2e9cf88';c.lineWidth=.7;
+    c.rotate(beat*.10);const fg=c.createLinearGradient(0,8,-18,27);fg.addColorStop(0,style.body);fg.addColorStop(1,'#398dcb');c.fillStyle=fg;c.strokeStyle=style.edge;c.lineWidth=.7;
     c.beginPath();c.moveTo(4,8);c.bezierCurveTo(-1,17,-12,28+beat*3,-20,26+beat*3);c.quadraticCurveTo(-23,22,-13,12);c.quadraticCurveTo(-4,8,4,8);c.fill();c.stroke();
-    c.strokeStyle='#c8f2d37a';c.lineWidth=.5;
+    c.strokeStyle='#8ed6e77a';c.lineWidth=.5;
     for(let i=0;i<4;i++){c.beginPath();c.moveTo(0,11);c.quadraticCurveTo(-9,15+i*2,-18+i*2,24+i*.3+beat*2);c.stroke();}
     c.restore();
   }
   // An attached, forked caudal fin follows the final spine segment.
   const tail=basis(1);
   c.save();c.translate(tail.x,tail.y);c.rotate(tail.a+Math.sin(6.3-phase)*.13);
-  const tg=c.createLinearGradient(1,0,-24,0);tg.addColorStop(0,'#ccac31');tg.addColorStop(.3,style.tail);tg.addColorStop(1,'#ffe798');
-  c.fillStyle=tg;c.strokeStyle='#445e5480';c.lineWidth=.65;
+  const tg=c.createLinearGradient(1,0,-24,0);tg.addColorStop(0,style.edge);tg.addColorStop(.3,style.tail);tg.addColorStop(1,'#58b8dc');
+  c.fillStyle=tg;c.strokeStyle=style.edge;c.lineWidth=.65;
   c.beginPath();c.moveTo(3,-1.7);c.bezierCurveTo(-5,-2,-16,-11,-24,-17);c.quadraticCurveTo(-25,-9,-16,0);c.quadraticCurveTo(-25,9,-24,17);c.bezierCurveTo(-16,11,-5,2,3,1.7);c.closePath();c.fill();c.stroke();
-  c.strokeStyle='#917c3266';c.lineWidth=.45;
+  c.strokeStyle='#174d7f88';c.lineWidth=.45;
   for(const side of [-1,1])for(let i=0;i<4;i++){c.beginPath();c.moveTo(0,side);c.quadraticCurveTo(-11,side*(3+i),-22+i*1.6,side*(14-i*3));c.stroke();}
   c.restore();
   // A closed, curved torso is redrawn along the same spine on every frame.
@@ -56,13 +56,20 @@ function draw(c,fish,time,options={}){
   c.strokeStyle='#ddfff322';c.lineWidth=3;
   for(let i=0;i<3;i++){c.beginPath();c.moveTo(-48+i*34+Math.sin(time*.3)*7,-22);c.bezierCurveTo(-35+i*34,0,-45+i*34,6,-28+i*34,22);c.stroke();}
   c.restore();
+  if(options.alleles){
+    for(let i=0;i<2;i++){
+      const p=point(.40+i*.075,0);ellipse(c,p.x,p.y,2.8,2.8,options.alleles[i]?'#29d1be':'#f6a183');
+      c.strokeStyle='#effff1';c.lineWidth=.8;c.stroke();
+      if(options.alleles[i]){c.strokeStyle='#216c75';c.lineWidth=.8;c.beginPath();c.moveTo(p.x-1.4,p.y-1.4);c.lineTo(p.x+1.4,p.y+1.4);c.stroke();}
+    }
+  }
   // Two small lateral eyes and gill covers give the head a finished shape.
   for(const side of [-1,1]){
     const p=point(.105,side*7.1);
     ellipse(c,p.x,p.y,2.6,2,'#133454');ellipse(c,p.x+.2,p.y-side*.2,1.55,1.4,'#16262d');ellipse(c,p.x+.65,p.y-.55,.55,.45,'#e6f4db');
     const a=point(.22,side*10.6),b=point(.27,side*12.6);
     c.strokeStyle='#11437688';c.lineWidth=.7;c.beginPath();c.moveTo(a.x,a.y);c.quadraticCurveTo(b.x-2,b.y,b.x,b.y);c.stroke();
-    const spineMark=point(.91,side*2);c.strokeStyle='#e9d267';c.lineWidth=1.3;c.beginPath();c.moveTo(spineMark.x-2,spineMark.y);c.lineTo(spineMark.x+2,spineMark.y);c.stroke();
+    const spineMark=point(.91,side*2);c.strokeStyle='#8ad0e5';c.lineWidth=1.3;c.beginPath();c.moveTo(spineMark.x-2,spineMark.y);c.lineTo(spineMark.x+2,spineMark.y);c.stroke();
   }
   const nose=spine(0);c.strokeStyle='#23547d';c.lineWidth=.7;c.beginPath();c.moveTo(nose.x-.5,nose.y-1.5);c.quadraticCurveTo(nose.x+1,nose.y,nose.x-.5,nose.y+1.5);c.stroke();
   c.restore();
