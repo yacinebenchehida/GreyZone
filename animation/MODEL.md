@@ -20,3 +20,5 @@ Checks cover binomial moments, diploid drift variance and diversity loss, initia
 
 Background: Bailleul et al. (2018), doi:10.1111/eva.12591; Ben Chehida et al. (2020), doi:10.1038/s41437-019-0284-1; Schleimer et al. (2024), doi:10.1111/icad.12725.
 
+
+Swimming uses illustrative immersion cycles: underwater silhouettes fade at depth, a moving surface mask hides portions of the body, and wakes and foam follow the animals. Occasional breaches and fluke lifts are decorative. These behaviours do not change the population model.

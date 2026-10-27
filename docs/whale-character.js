@@ -81,13 +81,30 @@ function draw(c,whale,time=0,pose={}){
   c.save();c.translate(whale.x,whale.y);
   // Keep the face readable, with a small bank into turns and mirrored headings.
   const right=Math.cos(heading)>=0;
-  c.rotate(Math.sin(heading)*.24*(right?1:-1));
-  const scale=whale.scale||1;c.scale(scale,scale);if(right)c.scale(-1,1);
+  c.rotate(pose.swimming?heading:Math.sin(heading)*.24*(right?1:-1));
+  if(pose.breach)c.rotate(-pose.breach*.65);
+  const scale=whale.scale||1;c.scale(scale,scale);if(pose.swimming||right)c.scale(-1,1);
   c.translate(0,still?0:Math.sin(cycle)*.9);
   c.imageSmoothingEnabled=true;c.imageSmoothingQuality='high';
   const unit=120/W;
-  if(frame)c.drawImage(frame,(-W*.40-PAD)*unit,(-H*.50-PAD)*unit,(W+PAD*2)*unit,(H+PAD*2)*unit);
-  else c.drawImage(source,-48,-H*unit/2,120,H*unit);
+  function paint(){
+    if(frame)c.drawImage(frame,(-W*.40-PAD)*unit,(-H*.50-PAD)*unit,(W+PAD*2)*unit,(H+PAD*2)*unit);
+    else c.drawImage(source,-48,-H*unit/2,120,H*unit);
+  }
+  if(pose.swimming&&!pose.breach){
+    const depth=pose.depth||0;
+    // A dim blue silhouette remains under the surface, then vanishes at depth.
+    c.save();c.globalAlpha*=Math.max(0,.30-depth*.36);paint();c.restore();
+    c.save();
+    if(pose.fluke){c.beginPath();c.rect(29,-43,50,49);c.clip();}
+    else{
+      const line=16-depth*67;
+      c.beginPath();c.moveTo(-85,-60);c.lineTo(90,-60);c.lineTo(90,line);
+      for(let x=90;x>=-85;x-=5)c.lineTo(x,line+Math.sin(x*.16+time*3+phase)*1.5);
+      c.closePath();c.clip();
+    }
+    paint();c.restore();
+  }else paint();
   if(pose.alleles){
     for(let i=0;i<2;i++){
       const x=2+i*8,y=-14;c.beginPath();c.arc(x,y,3.1,0,TAU);
@@ -97,7 +114,7 @@ function draw(c,whale,time=0,pose={}){
     }
   }
   const breath=(time+phase*3.6)%18;
-  if(!still&&breath<1.45)splash(c,breath/1.45);
+  if(!still&&breath<1.45&&(!pose.swimming||pose.depth<.35)&&!pose.fluke)splash(c,breath/1.45);
   c.restore();
 }
 root.WhaleCharacter={draw};
