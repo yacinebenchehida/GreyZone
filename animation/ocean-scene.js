@@ -10,9 +10,9 @@ class OceanScene{
     this.travelPace=this.travelPace||3;
     const r=this.random,n=24,left=Math.round(n*settings.ratio/100);
     this.animals=Array.from({length:n},(_,i)=>{
-      const side=i<left?0:1,angle=i/n*TAU+r()*.15,radius=.65+r()*.3;
-      return {id:i,side,x:.50+Math.cos(angle)*.34*radius,y:.52+Math.sin(angle)*.29*radius,
-        heading:Math.atan2(Math.cos(angle)*this.h*.29,-Math.sin(angle)*this.w*.34),
+      const side=i<left?0:1;
+      return {id:i,side,x:.08+r()*.84,y:.15+r()*.70,
+        heading:r()*TAU,
         phase:r()*TAU,stroke:r()*TAU,effort:.8,speed:.045+r()*.01,size:.87+r()*.18,turn:0,cross:null};
     });
     this.sparks=Array.from({length:90},()=>({x:r(),y:r(),phase:r()*TAU,size:.5+r()}));this.resize();
@@ -25,7 +25,7 @@ class OceanScene{
   assignSides(){
     const ordered=[...this.animals].sort((a,b)=>a.x-b.x),west=Math.round(ordered.length*this.settings.ratio/100);
     ordered.forEach((a,i)=>{
-      a.side=i<west?0:1;
+      a.side=i<west?0:1;a.wanderTarget=null;
       const bounds=this.bounds(a.y*this.h,a.side),end=clamp(a.x*this.w,bounds[0]+18,bounds[1]-18)/this.w;
       if(this.reduced.matches)a.x=end;
       else if(Math.abs(end-a.x)>.003)a.settle={from:a.x,to:end,elapsed:0};
@@ -46,12 +46,11 @@ class OceanScene{
     // Read neighbours from one snapshot, so drawing order cannot steer the school.
     const snapshot=animals.map(a=>({...a}));
     for(const a of animals){
-      const x=a.x*w,y=a.y*h,area=state.split?this.bounds(h*.52,a.side):[48,w-48],cx=(area[0]+area[1])/2,cy=h*(.52+.025*Math.sin(this.clock*.12));
+      const x=a.x*w,y=a.y*h,boundsAt=yy=>state.split?this.bounds(yy,a.side):[40,w-40];
       a.effort=.7+.25*(.5+.5*Math.sin(this.clock*.45+a.phase));a.stroke+=dt*(4.5+a.effort*1.8);
       if(a.settle){const q=a.settle;q.elapsed+=dt;const u=clamp(q.elapsed/1.45,0,1),ease=u*u*(3-2*u);a.x=q.from+(q.to-q.from)*ease;a.heading+=clamp(angleDelta(a.heading,q.to>q.from?0:Math.PI),-dt*4.4,dt*4.4);if(u>=1)a.settle=null;continue;}
-      const rx=Math.max(18,(area[1]-area[0])*.40),ry=Math.max(55,(h-185)*.46);
-      const angle=Math.atan2((y-cy)/ry,(x-cx)/rx),track=.65+(a.id%5)*.075;
-      let tx=cx+Math.cos(angle+.5)*rx*track,ty=cy+Math.sin(angle+.5)*ry*track;
+      const target=FreeSwim.goal(a,{x,y,speed:a.speed*w*pace,time:this.clock,random:this.random,bounds:boundsAt,yMin:55,yMax:h-45});
+      let tx=target.x,ty=target.y;
       let fx=0,fy=0,ax=0,ay=0,near=0,space=1;
       for(const b of snapshot){
         if(a.id===b.id||(state.split&&a.side!==b.side)||a.cross||b.cross||b.settle)continue;
@@ -60,20 +59,18 @@ class OceanScene{
         if(d>0&&d<95&&(-dx*Math.cos(a.heading)-dy*Math.sin(a.heading))/d>.6)space=Math.min(space,clamp((d-24)/65,.35,1));
         if(d>=65&&d<125){ax+=Math.cos(b.heading);ay+=Math.sin(b.heading);near++;}
       }
-      if(near){fx+=ax/near*.15;fy+=ay/near*.15;}
+      // Mild local alignment, without a shared destination or circular course.
+      if(near){fx+=ax/near*.06;fy+=ay/near*.06;}
       let desired=Math.atan2(ty-y,tx-x),speed=a.speed*w*pace*space;
       if(a.cross){
         const sign=a.cross.side?1:-1,coast=this.coast(gap.y),entry=coast.x-sign*(coast.half+58),exit=coast.x+sign*(coast.half+58);
         ty=gap.y;
         if(a.cross.stage===0){tx=entry;const distance=Math.hypot(tx-x,ty-y);speed*=clamp(distance/85,.22,1);if(distance<17)a.cross.stage=1;}
-        if(a.cross.stage===1){tx=exit;if(sign*(x-exit)>-7){a.side=a.cross.side;a.cross=null;}}
+        if(a.cross.stage===1){tx=exit;if(sign*(x-exit)>-7){a.side=a.cross.side;a.cross=null;a.wanderTarget=null;}}
         desired=Math.atan2(ty-y,tx-x);
       }else{
-        const bounds=state.split?this.bounds(y,a.side):[40,w-40];
-        if(x<bounds[0]+30)fx+=(bounds[0]+30-x)/20;
-        if(x>bounds[1]-30)fx-=(x-bounds[1]+30)/20;
-        if(y<100)fy+=(100-y)/35;
-        if(y>h-65)fy-=(y-h+65)/30;
+        const wall=FreeSwim.avoid({x,y,heading:a.heading,speed,bounds:boundsAt,yMin:55,yMax:h-45});
+        fx+=wall.x;fy+=wall.y;
         desired=Math.atan2(Math.sin(desired)+fy,Math.cos(desired)+fx);
       }
       const difference=angleDelta(a.heading,desired),turn=clamp(difference,-dt*4.4,dt*4.4);
@@ -82,7 +79,7 @@ class OceanScene{
       a.turn+=(bend-a.turn)*Math.min(1,dt*7);
       // Body-wave cadence is independent of travel speed.
       a.x+=Math.cos(a.heading)*speed*dt/w;a.y+=Math.sin(a.heading)*speed*dt/h;
-      a.y=clamp(a.y,70/h,(h-50)/h);
+      a.y=clamp(a.y,55/h,(h-45)/h);
       if(a.cross&&a.cross.stage===1){a.y=clamp(a.y,(gap.y-gap.half+12)/h,(gap.y+gap.half-12)/h);}
       else{const bounds=state.split?this.bounds(a.y*h,a.side):[40,w-40];a.x=clamp(a.x,bounds[0]/w,bounds[1]/w);}
       a.x=clamp(a.x,18/w,1-18/w);
