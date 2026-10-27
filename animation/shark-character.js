@@ -26,6 +26,9 @@ function followTurn(animal,dt,scale,speed){
   for(let i=1;i<count;i++){
     const target=i===1?animal.heading:previous[i-1];
     animal.jointHeadings[i]+=delta(animal.jointHeadings[i],target)*blend;
+    // Keep accumulated lag away from the angle wrap during tight, slow turns.
+    const lag=delta(animal.heading,animal.jointHeadings[i]);
+    animal.jointHeadings[i]=animal.heading+Math.max(-2.2,Math.min(2.2,lag));
   }
   animal.turnPose=animal.jointHeadings.map((angle,i)=>{
     const limit=.90*Math.pow(i/(count-1),.9);
@@ -80,6 +83,13 @@ function draw(c,animal,time=0,options={}){
   c.save();contour(c,body);c.clip();
   for(const side of [-1,1]){c.beginPath();for(let i=0;i<50;i++){const u=.08+i/49*.81,ix=u*(half.length-1),lo=Math.floor(ix),r=(half[lo]+(half[Math.min(lo+1,half.length-1)]-half[lo])*(ix-lo))*style.width*.92,p=at(u,side*r);i?c.lineTo(p.x,p.y):c.moveTo(p.x,p.y);}c.strokeStyle='#eeeeee94';c.lineWidth=1.15;c.stroke();}
   c.restore();
+  if(options.alleles){
+    for(let i=0;i<2;i++){
+      const p=at(.40+i*.06,0);oval(c,p.x,p.y,3.0,3.0,options.alleles[i]?'#29d1be':'#f6a183');
+      c.strokeStyle='#effff1';c.lineWidth=.8;c.stroke();
+      if(options.alleles[i]){c.strokeStyle='#216c75';c.lineWidth=.8;c.beginPath();c.moveTo(p.x-1.4,p.y-1.4);c.lineTo(p.x+1.4,p.y+1.4);c.stroke();}
+    }
+  }
   // Five short gill slits on each flank, behind the eyes.
   for(const side of [-1,1])for(let i=0;i<5;i++){
     const u=.18+i*.026,r=(11.3+i*1.25)*style.width,p=at(u,side*r);c.strokeStyle='#3c3c3ca0';c.lineWidth=.65;c.beginPath();c.moveTo(p.x+1,p.y-side*2.4);c.quadraticCurveTo(p.x-1,p.y-side*.7,p.x-.8,p.y+side*.8);c.stroke();

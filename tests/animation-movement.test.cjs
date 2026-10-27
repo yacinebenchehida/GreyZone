@@ -9,7 +9,7 @@ function scene(width=940,ratio=50,reduced=false){
   const ctx=new Proxy({createLinearGradient:()=>gradient,createRadialGradient:()=>gradient},{get:(o,k)=>o[k]||(()=>{})});
   const world={Math,Number,devicePixelRatio:1,document:{createElement:()=>({getContext:()=>ctx})},matchMedia:()=>({matches:reduced}),performance:{now:()=>0}};
   vm.createContext(world);
-  for(const name of ['model.js','swim-motion.js','ocean-scene.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation',name),'utf8'),world);
+  for(const name of ['model.js','swim-motion.js','shark-character.js','ocean-scene.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation',name),'utf8'),world);
   const canvas={getContext:()=>ctx,getBoundingClientRect:()=>({width,height:540}),addEventListener(){},style:{}};
   const s=new world.OceanScene(canvas);s.reset({ratio});s.assignSides();return s;
 }
@@ -31,8 +31,8 @@ for(const [width,ratio,migrants]of [[940,50,0],[370,10,0],[370,90,20],[940,50,20
       });
     }
     if(migrants)assert(crossings>0,'The open channel should permit crossings');else assert.equal(crossings,0);
-    assert.equal(visits[0].size,12,'The western fish should visit all twelve water regions');
-    assert.equal(visits[1].size,12,'The eastern fish should visit all twelve water regions');
+    assert.equal(visits[0].size,12,'The western sharks should visit all twelve water regions');
+    assert.equal(visits[1].size,12,'The eastern sharks should visit all twelve water regions');
   });
 }
 
@@ -47,4 +47,18 @@ test('reduced motion places the split representatives in their basins without an
   for(const a of s.animals){const limits=s.bounds(a.y*s.h,a.side);assert(a.x*s.w>=limits[0]&&a.x*s.w<=limits[1]);}
   for(let i=0;i<60;i++)s.update(1/60,{split:true,migrants:20});
   assert.deepEqual(s.animals.map(a=>[a.x,a.y,a.stroke]),positions);
+});
+
+
+test('normal travel covers at least 14% of the open-water width per second, with a faster option',()=>{
+  function distance(pace){
+    const s=scene(),a=s.animals[0];s.animals=[a];s.travelPace=pace;
+    a.settle=null;a.x=.15;a.y=.5;a.heading=0;a.speed=.05;
+    a.wanderTarget={x:.9*s.w,y:.5*s.h,until:999};
+    const start=a.x*s.w;
+    for(let i=0;i<60;i++){s.clock+=1/60;s.update(1/60,{split:false,migrants:0});}
+    return (a.x*s.w-start)/s.w;
+  }
+  const normal=distance(3),fast=distance(4.5);
+  assert(normal>=.14);assert(fast>normal*1.45);
 });

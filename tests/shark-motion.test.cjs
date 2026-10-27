@@ -23,10 +23,10 @@ test('rear body sections lag behind the head in a turn and relax afterward',()=>
 });
 
 test('sharp turns keep the spine finite, attached at the head, and approximately constant in length',()=>{
-  for(const sign of [-1,1])for(const scale of [.65,1.4]){
+  for(const sign of [-1,1])for(const scale of [.3,.65,1.4])for(const rate of [2.2,4.4]){
     const shark={heading:0,stroke:.9,effort:.8};followTurn(shark,0,scale,180);
     for(let frame=0;frame<120;frame++){
-      shark.heading+=sign*2.2/60;followTurn(shark,1/60,scale,180);
+      shark.heading+=sign*rate/60;followTurn(shark,1/60,scale,180);
       const rig=makeSpine(shark),head=rig.spine(0);assert.equal(head.x,74);assert.equal(head.y,0);
       let length=0,previous=head;
       for(let i=1;i<=100;i++){const p=rig.spine(i/100);assert(Number.isFinite(p.x+p.y+rig.basis(i/100).a));length+=Math.hypot(p.x-previous.x,p.y-previous.y);previous=p;}
