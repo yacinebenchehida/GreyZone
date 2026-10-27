@@ -1,4 +1,4 @@
-const test=require('node:test'),assert=require('node:assert/strict'),M=require('../inst/greyzone-animation/model.js');
+const test=require('node:test'),assert=require('node:assert/strict'),M=require('../animation/model.js');
 const settings={total:4000,ratio:50,migrants:0,sample:50,loci:32};
 test('split sizes conserve total; initial frequencies match exactly and are representable',()=>{for(const total of [200,1000,4000,20000,100000])for(const ratio of [10,30,50,90]){const s={...settings,total,ratio},[n1,n2]=M.sizes(s),p=M.initial(s);assert.equal(n1+n2,total);assert.deepEqual(p.a,p.b);for(const x of p.a){assert.ok(Math.abs(x*2*n1-Math.round(x*2*n1))<1e-8);assert.ok(Math.abs(x*2*n2-Math.round(x*2*n2))<1e-8);}}});
 test('exact binomial sampler has expected moments, including large populations',()=>{for(const [n,p] of [[40,.01],[100,.5],[20000,.3],[200000,.5],[400,.99]]){const r=M.rng(n),reps=15000;let sum=0,sq=0;for(let i=0;i<reps;i++){const x=M.binomial(n,p,r);assert.ok(x>=0&&x<=n&&Number.isInteger(x));sum+=x;sq+=x*x;}const mean=sum/reps,v=sq/reps-mean*mean;assert.ok(Math.abs(mean-n*p)<6*Math.sqrt(n*p*(1-p)/reps));assert.ok(Math.abs(v/(n*p*(1-p))-1)<.07);}});

@@ -1,5 +1,8 @@
 # GreyZone package
 
+**[▶ Open the animation](https://yacinebenchehida.github.io/GreyZone/)** · [Animation folder](animation/)
+
+
 **Genetic lag time and power to detect population differentiation**
 
 *Yacine Ben Chehida, Anna Schleimer, Xenia Moreira Lopez* · first draft (v0.0.1)
