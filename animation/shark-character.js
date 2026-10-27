@@ -47,9 +47,6 @@ function draw(c,animal,time=0,options={}){
   for(const side of [-1,1])for(let i=0;i<5;i++){
     const u=.18+i*.026,r=(11.3+i*1.25)*style.width,p=at(u,side*r);c.strokeStyle='#3c3c3ca0';c.lineWidth=.65;c.beginPath();c.moveTo(p.x+1,p.y-side*2.4);c.quadraticCurveTo(p.x-1,p.y-side*.7,p.x-.8,p.y+side*.8);c.stroke();
   }
-  // The dorsal fin is raised above its contact shadow on the back.
-  function dorsal(u,size){const p=basis(u);c.save();c.translate(p.x,p.y);c.rotate(p.a);c.scale(size,size);oval(c,-5,3,14,4,'#2525252d');const dg=c.createLinearGradient(7,0,-12,-20);dg.addColorStop(0,style.body);dg.addColorStop(.6,style.top);dg.addColorStop(1,style.tip);c.fillStyle=dg;c.strokeStyle=style.edge;c.lineWidth=.6;c.beginPath();c.moveTo(12,1);c.bezierCurveTo(6,-5,3,-16,-4,-22);c.quadraticCurveTo(-7,-23,-7,-18);c.quadraticCurveTo(-8,-7,-17,-1);c.quadraticCurveTo(-5,2,12,1);c.fill();c.stroke();if(style===profiles.classic){c.fillStyle=style.tip;c.beginPath();c.moveTo(-4,-22);c.lineTo(-.8,-17);c.lineTo(-7.8,-12);c.lineTo(-7,-18);c.closePath();c.fill();}c.strokeStyle='#dddddd6b';c.lineWidth=.7;c.beginPath();c.moveTo(10,0);c.quadraticCurveTo(1,-12,-4,-21);c.stroke();c.restore();}
-  dorsal(style===profiles.slender?.46:.39,1);dorsal(.79,.32);
   if(style.hammer){
     c.save();const p=basis(.095);c.translate(p.x,p.y);c.rotate(p.a);
     const hg=c.createLinearGradient(0,-32,0,32);hg.addColorStop(0,style.top);hg.addColorStop(.4,style.light);hg.addColorStop(.7,style.body);hg.addColorStop(1,style.top);c.fillStyle=hg;c.strokeStyle=style.edge;c.lineWidth=.7;
