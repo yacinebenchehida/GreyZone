@@ -2,7 +2,17 @@
 
 Standalone educational browser prototype. This is separate from the R package and from the This is not a species website.
 
-Open `index.html` in a static web server. In this Sites checkout the browser files are in `dist/`; in the GreyZone repository they are in `inst/greyzone-animation/`. For example, from that folder run `python3 -m http.server 8000`, then visit `http://localhost:8000`.
+## Open the animation
+
+The source files are in `inst/greyzone-animation/`. To run locally, serve that folder with `python3 -m http.server 8000`, then visit `http://localhost:8000`.
+
+## GitHub Pages
+
+The `docs/` folder contains the same browser files, ready for GitHub Pages. In repository **Settings → Pages**, choose **Deploy from a branch**, branch **main**, folder **/docs**, and **Save**. GitHub will display the published URL once deployment finishes.
+
+The repository can remain private if its GitHub plan supports Pages for private repositories. Publishing the animation does not require publishing the R package source.
+
+After editing the source animation, run `python3 scripts/sync_animation_docs.py` from the repository root and commit the updated source and `docs/` files together.
 
 Raise the barrier, advance generations, take samples, and estimate power. Controls set the ancestral total, western population share, symmetric migrants per generation, sample size and SNP count. Reset makes a fresh population history. Power uses a fixed ensemble seed so design comparisons are reproducible.
 
