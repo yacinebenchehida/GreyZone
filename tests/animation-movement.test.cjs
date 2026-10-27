@@ -50,7 +50,7 @@ test('reduced motion places the split representatives in their basins without an
 });
 
 
-test('normal travel covers at least 8% of the open-water width per second, with a faster option',()=>{
+test('normal travel is slower and covers about 6% of the open-water width per second, with a faster option',()=>{
   function distance(pace){
     const s=scene(),a=s.animals[0];s.animals=[a];s.travelPace=pace;
     a.settle=null;a.x=.15;a.y=.5;a.heading=0;a.speed=.05;
@@ -59,8 +59,8 @@ test('normal travel covers at least 8% of the open-water width per second, with 
     for(let i=0;i<60;i++){s.clock+=1/60;s.update(1/60,{split:false,m:0});}
     return (a.x*s.w-start)/s.w;
   }
-  const normal=distance(1.75),fast=distance(3);
-  assert(normal>=.08);assert(fast>normal*1.65);
+  const normal=distance(1.3),fast=distance(2.2);
+  assert(normal>=.06&&normal<.07);assert(fast>normal*1.6);
 });
 
 test('the scene creates the requested scaled headcount and split, and starts more exchanges at higher migration',()=>{
@@ -72,9 +72,9 @@ test('the scene creates the requested scaled headcount and split, and starts mor
     if(total===200){assert.equal(s.animals.length,200);assert.equal(s.display.west,60);}
   }
   const starts=[];
-  for(const m of [0,.001,.01,.1]){
+  for(const m of [0,.0001,.001,.01]){
     s.reset({total:200,ratio:50,loci:32,m});s.assignSides();
-    for(let frame=0;frame<600;frame++){s.clock+=.1;s.update(.1,{split:true,m,generationRate:12});assert(s.animals.filter(a=>a.cross).length<=2,'At most one pair may be in transit');}
+    for(let frame=0;frame<600;frame++){s.clock+=.1;s.update(.1,{split:true,m,generationRate:12});assert(s.animals.filter(a=>a.cross).length<=3,'At most three individuals may be in transit');}
     starts.push(s.migrationStarts);
   }
   assert.equal(starts[0],0);assert(starts[1]>0&&starts[1]<starts[2]&&starts[2]<starts[3]);
@@ -87,4 +87,14 @@ test('the scene creates the requested scaled headcount and split, and starts mor
 test('high migration widens the channel modestly without changing its centre',()=>{
   const s=scene();s.settings.m=.0001;const low=s.gap();s.settings.m=.5;const high=s.gap();
   assert.equal(low.y,high.y);assert(high.half>low.half);assert(high.half<=s.h*.075+1e-9);
+});
+
+
+test('a completed crossing refreshes the actual diploid dots without needing another generation',()=>{
+  const s=scene(),a=s.animals.find(x=>x.side===0),gap=s.gap(),coast=s.coast(gap.y),clearance=Math.max(58,118*s.actorScale(a)+12);
+  a.settle=null;a.x=(coast.x+coast.half+clearance)/s.w;a.y=gap.y/s.h;a.cross={side:1,stage:1};
+  const state={split:true,m:.01,generation:10,generationRate:0,markers:true,p1:Array(32).fill(0),p2:Array(32).fill(1)};
+  s.prepareMarkers(state);assert(s.markerCopies(a).every(pair=>pair.every(x=>!x)));
+  s.update(.001,state);assert.equal(a.side,1);s.prepareMarkers(state);
+  assert(s.markerCopies(a).every(pair=>pair.every(Boolean)));
 });

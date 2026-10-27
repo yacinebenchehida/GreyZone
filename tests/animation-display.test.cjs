@@ -50,9 +50,9 @@ test('sparse crossing rates respond to m and playback, stay capped and are zero 
   const s={total:20000,ratio:50,m:0};assert.equal(D.migrationRate(s,12),0);
   const rates=[.00001,.0001,.001].map(m=>D.migrationRate({...s,m},12));assert(rates[0]<rates[1]&&rates[1]<rates[2]);
   assert.equal(D.migrationRate({...s,m:.01},0),0);
-  assert(D.migrationRate({...s,m:.001},50)>rates[2]);
-  assert(D.migrationRate({...s,total:200,m:.001},12)<rates[2]);
-  assert(D.migrationRate({...s,total:500000,m:.5},50)<=.2);
+  assert(D.migrationRate({...s,m:.0001},50)>rates[1]);
+  assert(D.migrationRate({...s,total:200,m:.0001},12)<rates[1]);
+  assert(D.migrationRate({...s,total:500000,m:.5},50)<=.65);
 });
 
 test('unchanged frequencies keep identical dots, fixation has no mixed colours, and FST=1 can include shared fixed alleles',()=>{

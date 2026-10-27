@@ -8,12 +8,10 @@ function summary(settings){
   return {total,west,east:total-west,weight:settings.total/total,exact:settings.total<=200};
 }
 function markerIndices(loci){const n=Math.min(10,loci);return Array.from({length:n},(_,i)=>n===1?0:Math.round(i*(loci-1)/(n-1)));}
-// A sparse illustration of exchange intensity, capped at one paired event
-// every five seconds. The scene also waits for the previous pair to finish.
+// Single illustrative crossings. The rate is linear in m until a visual cap.
 function migrationRate(settings,generationsPerSecond){
   if(settings.m<=0||generationsPerSecond<=0)return 0;
-  const expected=settings.m*count(settings.total)*.5*generationsPerSecond;
-  return Math.min(.2,.045*Math.log1p(expected));
+  return Math.min(.65,settings.m*count(settings.total)*generationsPerSecond*.25);
 }
 function sorting(frequencies){
   let fixed=0,opposite=0;

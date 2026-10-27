@@ -7,7 +7,7 @@ class OceanScene{
   constructor(canvas){this.canvas=canvas;this.c=canvas.getContext('2d');this.w=1000;this.h=540;this.clock=0;this.last=0;this.wasSplit=false;this.raised=0;this.selected=-1;this.hover=-1;this.reduced=matchMedia('(prefers-reduced-motion: reduce)');canvas.addEventListener('pointermove',e=>{const b=canvas.getBoundingClientRect(),x=e.clientX-b.left,y=e.clientY-b.top;let best=34;this.hover=-1;for(const a of this.animals||[]){const d=Math.hypot(a.x*this.w-x,a.y*this.h-y);if(d<best){best=d;this.hover=a.id;}}canvas.style.cursor=this.hover<0?'default':'pointer';});canvas.addEventListener('pointerleave',()=>{this.hover=-1;});canvas.addEventListener('click',()=>{this.selected=this.selected===this.hover?-1:this.hover;});}
   reset(settings){
     this.settings=settings;this.random=GreyModel.rng(settings.displaySeed??8102);this.wasSplit=false;this.raised=0;this.selected=-1;this.clock=0;this.last=0;this.migrationBudget=0;this.migrationStarts=0;this.nextMigration=0;this.markerCache=null;this.frozenKey=null;
-    this.travelPace=this.travelPace||1.75;
+    this.travelPace=this.travelPace||1.3;
     this.display=GreyDisplay.summary(settings);
     const r=this.random,n=this.display.total,left=this.display.west;
     this.animals=Array.from({length:n},(_,i)=>{
@@ -36,20 +36,15 @@ class OceanScene{
   update(dt,state){
     if(this.reduced.matches)return;
     const w=this.w,h=this.h,gap=this.gap(),animals=this.animals,pace=this.travelPace;
-    if(state.split&&this.clock-this.raised>1.7&&this.clock>=this.nextMigration&&!animals.some(a=>a.cross)){
+    if(state.split&&this.clock-this.raised>1.7&&this.clock>=this.nextMigration){
       const rate=GreyDisplay.migrationRate(this.settings,state.generationRate||0);
       this.migrationBudget=Math.min(1,this.migrationBudget+rate*dt);
-      while(this.migrationBudget>=1){
-        const pair=[];
-        for(let side=0;side<2;side++){
-          const coast=this.coast(gap.y),entry=coast.x+(side?1:-1)*(coast.half+58);
-          let chosen=null,best=Infinity;
-          for(const a of animals)if(a.side===side&&!a.cross&&!a.settle){const d=Math.hypot(a.x*w-entry,a.y*h-gap.y);if(d<best){best=d;chosen=a;}}
-          pair.push(chosen);
-        }
-        if(pair.some(a=>!a))break;
-        for(const a of pair)a.cross={side:1-a.side,stage:0};
-        this.migrationStarts+=2;this.migrationBudget=0;this.nextMigration=this.clock+5;break;
+      if(rate>0&&this.migrationBudget>=1&&animals.filter(a=>a.cross).length<3){
+        // Alternate directions to preserve the settled population ratio.
+        const side=this.migrationStarts%2,coast=this.coast(gap.y),entry=coast.x+(side?1:-1)*(coast.half+58);
+        let chosen=null,best=Infinity;
+        for(const a of animals)if(a.side===side&&!a.cross&&!a.settle){const d=Math.hypot(a.x*w-entry,a.y*h-gap.y);if(d<best){best=d;chosen=a;}}
+        if(chosen){chosen.cross={side:1-side,stage:0};chosen.wanderTarget=null;this.migrationStarts++;this.migrationBudget=0;this.nextMigration=this.clock+.5;}
       }
     }
     // A spatial grid keeps spacing local even with hundreds of representatives.
@@ -72,8 +67,8 @@ class OceanScene{
       if(a.cross){
         const sign=a.cross.side?1:-1,coast=this.coast(gap.y),clearance=Math.max(58,pad+12),entry=coast.x-sign*(coast.half+clearance),exit=coast.x+sign*(coast.half+clearance);
         ty=gap.y;
-        if(a.cross.stage===0){tx=entry;const distance=Math.hypot(tx-x,ty-y);speed*=clamp(distance/85,.22,1);if(distance<17)a.cross.stage=1;}
-        if(a.cross.stage===1){tx=exit;if(sign*(x-exit)>-7){a.side=a.cross.side;a.cross=null;a.wanderTarget=null;}}
+        if(a.cross.stage===0){tx=entry;const distance=Math.hypot(tx-x,ty-y);speed*=1.2;if(distance<Math.max(20,speed*dt*2))a.cross.stage=1;}
+        if(a.cross.stage===1){speed*=1.2;tx=exit;if(sign*(x-exit)>-7){a.side=a.cross.side;a.cross=null;a.wanderTarget=null;this.markerCache=null;}}
         desired=Math.atan2(ty-y,tx-x);
       }else{
         const wall=FreeSwim.avoid({x,y,heading:a.heading,speed,bounds:boundsAt,yMin,yMax});

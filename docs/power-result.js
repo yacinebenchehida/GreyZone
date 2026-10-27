@@ -1,20 +1,15 @@
-/* Interpret the simulated power curve without extrapolating beyond its range. */
+/* Live batch estimates: no future search and no extrapolated probabilities. */
 (function(root){
 'use strict';
 function summary(data){
-  if(!data||!data.complete)return {status:'pending'};
-  if(!data.points?.length)return {status:'unavailable'};
-  const limit=data.max??data.points.at(-1).t,nullRate=data.points[0]?.power||0;
-  if(nullRate>.12)return {status:'uncalibrated',limit,nullRate};
-  const first=data.points.find(p=>p.power>=.8);
-  return first?{status:'reached',generation:first.t,limit}:{status:'not-reached',limit};
+  if(!data?.points?.length)return {status:'pending'};
+  const nullRate=data.points[0].power;
+  if(nullRate>.12)return {status:'uncalibrated',nullRate};
+  const first=data.points.find(p=>p.t>0&&p.power>=.8);
+  return first?{status:'reached',generation:first.t}:{status:'not-yet',limit:data.points.at(-1).t};
 }
 function at(points,generation){
-  if(!points?.length||generation<points[0].t||generation>points.at(-1).t)return null;
-  const right=points.findIndex(p=>p.t>=generation);
-  if(right===0)return points[0].power;
-  const a=points[right-1],b=points[right],f=(generation-a.t)/(b.t-a.t);
-  return a.power+f*(b.power-a.power);
+  return points?.find(p=>p.t===generation)?.power??null;
 }
 root.PowerResult={summary,at};
 })(globalThis);
