@@ -4,10 +4,10 @@
 
 1. Choose ancestral Ne, the split ratio, migration proportion **m**, sample size and SNP count.
 2. Press **Run simulation**, then watch or use **Pause** and **+1 generation**.
-3. The result says **Not reached yet** until at least 80% of 80 independent studies detect differentiation at a checked generation. It then displays the first crossing as a large **X generations** result, both in the main result panel and directly below the ocean. That number remains visible afterwards.
+3. The result says **Not reached yet** until at least 80% of 500 independent studies detect differentiation at a checked generation. It then displays the first crossing as a large **X generations** result, both in the main result panel and directly below the ocean. That number remains visible afterwards.
 4. Both FST and detection power continue on the same live time axis after that first crossing. **Run again** creates a fresh random history and batch.
 
-The 80 reference histories follow the live clock. There is no advance search, terminal search result, preset detection time or generation-window control. A slow calculation reports its last checked generation explicitly. Pause freezes the live clock, ocean, reference calculation and displayed result. Queued worker messages are held until Resume or an explicit step. The first crossing is a pointwise Monte Carlo estimate, not an irreversible biological change. Later power can fall again.
+The 500 reference histories follow the live clock. There is no advance search, terminal search result, preset detection time or generation-window control. A slow calculation reports its last checked generation explicitly. Pause freezes the live clock, ocean, reference calculation and displayed result. Queued worker messages are held until Resume or an explicit step. The first crossing is a pointwise Monte Carlo estimate, not an irreversible biological change. Later power can fall again.
 
 **Migration is m, not Nm.** It is the fraction of each receiving population's gene pool replaced per generation, with 0 ≤ m < 1. Both sides use the same m; expected immigrant contributions are mNe for each side. Single animated crossings alternate directions, with at most three sharks in transit. Their launch rate increases linearly with m below a visual cap. They illustrate intensity rather than count every migrant.
 
@@ -20,3 +20,6 @@ Headcounts are exact up to 200 individuals and compressed logarithmically above 
 [Model and development notes](MODEL.md)
 
 [Earlier fish swimming study](https://yacinebenchehida.github.io/GreyZone/fish-study.html) · [Compare shark designs](https://yacinebenchehida.github.io/GreyZone/shark-study.html)
+
+
+Generation playback uses half the earlier rates: Slow 1.5, Normal 6 and Fast 25 generations/second. These are upper limits. The live clock permits only one outstanding generation and waits for all 500 reference studies to finish before advancing. The worker reports completed histories within that generation. Sharks keep swimming while calculation is underway; explicit Pause still freezes both clocks and worker results. The histories, test and model equations are otherwise unchanged.

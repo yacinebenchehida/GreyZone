@@ -1,8 +1,8 @@
 (function(){
 'use strict';
 const M=GreyModel,$=id=>document.getElementById(id),canvas=$('scene'),ocean=new OceanScene(canvas);
-let s,pop,evolve,observe,split=false,running=false,paused=false,history=[],power=null,pendingPower=null,stepPowerTarget=null,worker=null,job=0,sampleResults=[],lastSampleGen=-1,last=0,accumulator=0,hasRun=false,runSeed=0,seedCounter=0;
-function settings(){return {total:+$('total').value,ratio:+$('ratio').value,m:+$('migration').value,sample:+$('sample-size').value,loci:+$('loci').value};}
+let s,pop,evolve,observe,split=false,running=false,paused=false,history=[],power=null,pendingPower=null,progress=null,pendingProgress=null,completedThrough=-1,stepPowerTarget=null,worker=null,job=0,sampleResults=[],lastSampleGen=-1,last=0,accumulator=0,hasRun=false,runSeed=0,seedCounter=0;
+function settings(){return {total:+$('total').value,ratio:+$('ratio').value,m:+$('migration').value,sample:+$('sample-size').value,loci:+$('loci').value,histories:500};}
 function number(x){return x.toLocaleString('en-GB');}
 function generationLimit(){return 200000;}
 function freshSeed(){
@@ -17,7 +17,7 @@ function reset(){
   $('sample-size').min=1;$('sample-size').step=1;$('sample-size').max=cap;
   if(s.sample>cap){$('sample-size').value=cap;s.sample=cap;}
   pop=M.initial(s);evolve=M.rng(runSeed^0x35ac17d9);observe=M.rng(runSeed^0x572109);
-  split=false;running=false;paused=false;hasRun=false;accumulator=0;power=null;pendingPower=null;stepPowerTarget=null;
+  split=false;running=false;paused=false;hasRun=false;accumulator=0;power=null;pendingPower=null;progress=null;pendingProgress=null;completedThrough=-1;stepPowerTarget=null;
   history=[{t:0,fst:0}];sampleResults=[];lastSampleGen=-1;prepareActors();
   $('total-out').textContent=number(s.total);$('ratio-out').textContent=s.ratio+'%';$('migration-out').textContent=s.m;$('sample-out').textContent=s.sample;
   $('n1').textContent=number(n1);$('n2').textContent=number(n2);
@@ -28,13 +28,13 @@ function reset(){
   $('calculate-power').disabled=false;$('calculate-power').textContent='Run simulation';$('power-progress').textContent='READY';
   $('power-time').textContent='—';$('power-scene-time').textContent='Choose settings, then Run simulation';
   $('power-meaning').textContent='Choose Ne, m, sample size and SNP count. Watch the live run. Detection power is estimated at the same generations.';
-  $('power-note').textContent='80 fresh histories follow the live clock. Evolution continues after detection.';
-  $('power-design').textContent=`West Ne ${number(n1)} · east Ne ${number(n2)} · m ${s.m} · ${s.sample} sampled per side · ${s.loci} ${s.loci===1?'SNP':'SNPs'}`;
+  $('power-note').textContent=`${number(s.histories)} independent histories follow the live clock. Evolution continues after detection.`;
+  $('power-design').textContent=`West Ne ${number(n1)} · east Ne ${number(n2)} · m ${s.m} · ${s.sample} sampled per side · ${s.loci} ${s.loci===1?'SNP':'SNPs'} · ${number(s.histories)} histories`;
   $('sample-generation').textContent='NOT SAMPLED';$('sample-result').className='sample-result';
   $('sample-result').innerHTML='<span class="sample-icon">?</span><strong>What would your study find?</strong><p>The barrier can be real even when the genetic test misses it.</p>';$('sample-history').textContent='';sync();
 }
 function startRun(){reset();hasRun=true;split=true;running=true;paused=false;$('split').textContent='Run again';$('take-sample').disabled=false;sync();calculatePower();}
-function sync(){const g=pop.generation;$('generation').textContent=number(g);$('play').disabled=!split||g>=generationLimit();$('step').disabled=!split||g>=generationLimit();$('play').textContent=running?'Pause':'Resume';$('play').setAttribute('aria-pressed',String(paused));$('calculate-power').setAttribute('aria-pressed',String(paused));$('phase').textContent=split?(s.m?'Two seas. A connecting channel.':'Two seas. Complete isolation.'):'One sea. One population.';$('barrier-label').hidden=!split;$('channel-label').hidden=!split||!s.m;$('fst-value').textContent='FST '+M.fst(pop.a,pop.b).toFixed(4);for(const [name,p] of [['west',pop.a[0]],['east',pop.b[0]]]){$(name+'-bead').style.width=100*p+'%';$(name+'-share').textContent=Math.round(100*p)+'%';}if(!split)$('story').textContent='Choose Ne, m and your study design, then press Run simulation.';else if(!g)$('story').textContent='The split has started. Both populations begin with identical allele frequencies.';else $('story').textContent=s.m?`Generation ${g}: drift pulls the populations apart; migrants reconnect their gene pools.`:`Generation ${g}: no individuals cross. A genetic study may still miss the separation.`;if(g>=generationLimit())$('story').textContent=`Paused at ${number(generationLimit())} generations. Sample this population, or Run again for a new history.`;const sorted=GreyDisplay.sorting([pop.a,pop.b]);$('sorting-status').textContent=`Fixed on both sides: ${sorted.fixed}/${sorted.total} SNPs · opposite fixed alleles: ${sorted.opposite}/${sorted.total}. Significance does not freeze allele frequencies.`;renderSnps();plotFst();plotPower();}
+function sync(){const g=pop.generation;$('generation').textContent=number(g);$('play').disabled=!split||g>=generationLimit();$('step').disabled=!split||g>=generationLimit()||completedThrough<g;$('play').textContent=running?'Pause':'Resume';$('play').setAttribute('aria-pressed',String(paused));$('calculate-power').setAttribute('aria-pressed',String(paused));$('phase').textContent=split?(s.m?'Two seas. A connecting channel.':'Two seas. Complete isolation.'):'One sea. One population.';$('barrier-label').hidden=!split;$('channel-label').hidden=!split||!s.m;$('fst-value').textContent='FST '+M.fst(pop.a,pop.b).toFixed(4);for(const [name,p] of [['west',pop.a[0]],['east',pop.b[0]]]){$(name+'-bead').style.width=100*p+'%';$(name+'-share').textContent=Math.round(100*p)+'%';}if(!split)$('story').textContent='Choose Ne, m and your study design, then press Run simulation.';else if(!g)$('story').textContent='The split has started. Both populations begin with identical allele frequencies.';else $('story').textContent=s.m?`Generation ${g}: drift pulls the populations apart; migrants reconnect their gene pools.`:`Generation ${g}: no individuals cross. A genetic study may still miss the separation.`;if(g>=generationLimit())$('story').textContent=`Paused at ${number(generationLimit())} generations. Sample this population, or Run again for a new history.`;const sorted=GreyDisplay.sorting([pop.a,pop.b]);$('sorting-status').textContent=`Fixed on both sides: ${sorted.fixed}/${sorted.total} SNPs · opposite fixed alleles: ${sorted.opposite}/${sorted.total}. Significance does not freeze allele frequencies.`;renderSnps();plotFst();plotPower();}
 function renderSnps(){
   const indices=GreyDisplay.markerIndices(s.loci);
   $('snp-frequencies').innerHTML='<thead><tr><th>SNP</th><th>West allele A</th><th>East allele A</th><th>State</th></tr></thead><tbody>'+indices.map((l,i)=>{
@@ -48,7 +48,7 @@ function plotFst(){const maxX=Math.max(10,Math.ceil(pop.generation/10)*10),maxY=
 function plotPower(){
   const points=power?.points||[],result=PowerResult.summary(power),max=Math.max(10,Math.ceil(pop.generation/10)*10);
   const crossing=result.status==='reached'?result.generation:null;
-  const c=baseChart(max,1,'Detection power · 80 independent histories',{percent:true,...(hasRun?{greyEnd:crossing??pop.generation}:{})});
+  const c=baseChart(max,1,`Detection power · ${number(s.histories)} independent histories`,{percent:true,...(hasRun?{greyEnd:crossing??pop.generation}:{})});
   c.svg+=`<line x1="${c.l}" x2="${c.r}" y1="${c.y(.8)}" y2="${c.y(.8)}" stroke="#b68a51" stroke-dasharray="4 4"/>`;
   const visible=points.filter(p=>p.t<=pop.generation);
   if(visible.length)c.svg+=`<polyline points="${visible.map(d=>c.x(d.t)+','+c.y(d.power)).join(' ')}" fill="none" stroke="#436a80" stroke-width="2.1"/>`;
@@ -56,7 +56,7 @@ function plotPower(){
   $('power-chart').innerHTML=c.svg+'</svg>';
   $('power-chart').setAttribute('aria-label',`Live detection power through generation ${power?.max??0}; 80% guide.`);
   const checked=visible.at(-1);
-  $('power-now').textContent=!hasRun?'Press Run simulation to begin.':checked?`Generation ${checked.t}: ${checked.hits} / 80 studies detect differentiation (${Math.round(checked.power*100)}%).`+(checked.t<pop.generation?(paused?` Power estimate paused; live generation ${pop.generation}.`:` Updating to live generation ${pop.generation}…`):''):'Starting the 80 histories…';
+  $('power-now').textContent=!hasRun?'Press Run simulation to begin.':checked?`Generation ${checked.t}: ${checked.hits} / ${number(s.histories)} studies detect differentiation (${Math.round(checked.power*100)}%).`+(checked.t<pop.generation?(paused?` Power estimate paused; live generation ${pop.generation}.`:` Updating to live generation ${pop.generation}…`):''):`Starting the ${number(s.histories)} histories…`;
   showPowerResult();
 }
 function showPowerResult(){
@@ -71,36 +71,41 @@ function showPowerResult(){
     meaning=`First checked generation with at least 80% detection power. This number stays visible as the simulation continues beyond it.`;
   }else{
     title='Not reached yet';short='Not reached yet';status=`Live generation ${number(pop.generation)}`;
-    meaning=checked?`No generation has reached 80% detection power yet. Latest estimate: ${Math.round(100*checked.power)}% at generation ${number(checked.t)}.`:'The 80 independent histories are starting. The generation number will appear here when detection power first reaches 80%.';
+    meaning=checked?`No generation has reached 80% detection power yet. Latest estimate: ${Math.round(100*checked.power)}% at generation ${number(checked.t)}.`:`The ${number(s.histories)} independent histories are starting. The generation number will appear here when detection power first reaches 80%.`;
   }
   $('power-time').textContent=title;$('power-meaning').textContent=meaning;$('power-scene-time').textContent=short;$('power-status').textContent=status;
-  $('power-progress').textContent=hasRun?(paused?'PAUSED':'RUNNING')+' · live generation '+number(pop.generation):'READY';
-  $('power-note').textContent='80 fresh histories · First checked crossing of the 80% guide. FST and genetics continue afterwards.';
+  const checking=hasRun&&completedThrough<pop.generation;
+  $('power-progress').textContent=!hasRun?'READY':(paused?(stepPowerTarget===null?'PAUSED':'STEPPING'):'RUNNING')+(checking?` · ${paused&&stepPowerTarget===null?"paused at":"checking"} generation ${number(pop.generation)} · ${progress?.generation===pop.generation?number(progress.done):0} / ${number(s.histories)} histories`:` · generation ${number(pop.generation)} · ${number(s.histories)} histories`);
+  $('power-note').textContent=`${number(s.histories)} independent histories · Generation playback waits for each power estimate. FST and genetics continue after the first 80% crossing.`;
   $('calculate-power').textContent=hasRun?(paused?'Resume simulation':'Pause simulation'):'Run simulation';
 }
-function acceptPower(data){power=data;plotFst();plotPower();}
+function acceptPower(data){power=data;completedThrough=Math.max(completedThrough,data.max);progress=null;sync();}
 function calculatePower(){
-  stopWorker();power=null;pendingPower=null;stepPowerTarget=null;const id=job;
-  try{worker=new Worker('power-worker.js?v=duration-pause-3');}catch(err){$('power-time').textContent='Power unavailable';return;}
+  stopWorker();power=null;pendingPower=null;progress=null;pendingProgress=null;completedThrough=-1;stepPowerTarget=null;const id=job;
+  try{worker=new Worker('power-worker.js?v=paced-histories-6');}catch(err){running=false;paused=true;sync();$('power-time').textContent='Power unavailable';return;}
   worker.onmessage=event=>{
     const data=event.data;if(data.id!==job)return;
+    if(data.type==='progress'){if(paused&&stepPowerTarget===null){pendingProgress=data;return;}progress=data;showPowerResult();return;}
+    // Only results for the displayed generation can update the live story.
+    if(data.max>pop.generation)return;
     // Queued worker messages must not repaint a paused result or its charts.
     if(paused&&stepPowerTarget===null){pendingPower=data;return;}
     if(stepPowerTarget!==null&&data.max>stepPowerTarget){pendingPower=data;return;}
     acceptPower(data);
-    if(paused&&stepPowerTarget!==null&&data.max>=stepPowerTarget){stepPowerTarget=null;worker.postMessage({type:'pause',id:job});}
+    if(paused&&stepPowerTarget!==null&&data.max>=stepPowerTarget){stepPowerTarget=null;worker.postMessage({type:'pause',id:job});sync();}
   };
-  worker.onerror=()=>{if(id!==job)return;stopWorker();$('power-time').textContent='Power unavailable';$('power-meaning').textContent='Reload the page to retry the live estimate.';};
+  worker.onerror=()=>{if(id!==job)return;setPlayback(false);stopWorker();$('power-time').textContent='Power unavailable';$('power-meaning').textContent='Reload the page to retry the live estimate.';};
   worker.postMessage({type:'init',settings:s,id,seed:runSeed^0x724ba719});
 }
 function setPlayback(play){
   running=Boolean(play)&&split&&pop.generation<generationLimit();paused=split&&!running;accumulator=0;stepPowerTarget=null;
   if(worker)worker.postMessage({type:running?'resume':'pause',id:job});
   if(running&&pendingPower){const data=pendingPower;pendingPower=null;acceptPower(data);}
+  if(running&&pendingProgress){progress=pendingProgress;pendingProgress=null;}
   sync();drawScene();
 }
 function togglePlayback(){setPlayback(!running);}
-function togglePower(){if(!hasRun){startRun();return;}togglePlayback();}
+function togglePower(){if(!hasRun||!worker){startRun();return;}togglePlayback();}
 function singleStep(){
   setPlayback(false);stepPowerTarget=pop.generation+1;
   if(pendingPower){acceptPower(pendingPower);pendingPower=null;}
@@ -109,6 +114,6 @@ function singleStep(){
 function takeSample(){if(!split)return;const result=M.sample(pop,s,observe),detected=result.p<=.05;if(lastSampleGen!==pop.generation){sampleResults=[];lastSampleGen=pop.generation;}sampleResults.push(detected);$('sample-generation').textContent='GEN '+pop.generation;$('sample-result').className='sample-result '+(detected?'detected':'missed');$('sample-result').innerHTML=`<span class="sample-icon">${detected?'✓':'≈'}</span><strong>${detected?'Difference detected':'No difference detected'}</strong><p>p ${result.p<.0001?'< 0.0001':'= '+result.p.toFixed(4)} · sampled FST ${result.fst.toFixed(4)}<br>${detected?'This sample supports genetic differentiation.':s.m?'A non-significant test does not establish panmixia.':'The populations are isolated; this sample does not reveal it.'}</p>`;$('sample-history').textContent=`At generation ${pop.generation}: ${sampleResults.filter(Boolean).length} of ${sampleResults.length} samples detected a difference. This is one population history, not the power curve.`;$('take-sample').innerHTML='Sample again <span>→</span>';}
 function resize(){ocean.resize();}
 function drawScene(){ocean.draw({split,paused,generation:pop.generation,m:s.m,generationRate:running?Number($('speed').value):0,p1:pop.a,p2:pop.b,markers:$('show-markers').checked});$('meet-shark').setAttribute('aria-pressed',String(ocean.selected>=0));}
-function frame(now){const dt=last?Math.min(.1,(now-last)/1000):0;last=now;if(!document.hidden){if(running){accumulator+=dt*(+$('speed').value);let changed=false;while(accumulator>=1&&running){accumulator--;step();changed=true;}if(changed)sync();}drawScene();}requestAnimationFrame(frame);}
+function frame(now){const dt=last?Math.min(.1,(now-last)/1000):0;last=now;if(!document.hidden){if(running){accumulator=Math.min(1,accumulator+dt*(+$('speed').value));if(accumulator>=1&&worker&&completedThrough>=pop.generation){accumulator=0;step();sync();}}drawScene();}requestAnimationFrame(frame);}
 $('shark-design').onchange=()=>{ocean.variant=$('shark-design').value;};$('travel-speed').onchange=()=>{ocean.travelPace=Number($('travel-speed').value);};$('meet-shark').onclick=()=>{ocean.selected=ocean.selected<0?1:-1;};$('split').onclick=startRun;$('play').onclick=togglePlayback;$('step').onclick=singleStep;$('reset').onclick=reset;$('take-sample').onclick=takeSample;$('calculate-power').onclick=togglePower;for(const id of ['total','ratio','migration','sample-size','loci'])$(id).addEventListener('change',reset);$('ratio').addEventListener('input',()=>$('ratio-out').textContent=$('ratio').value+'%');$('sample-size').addEventListener('input',()=>$('sample-out').textContent=$('sample-size').value);document.addEventListener('visibilitychange',()=>{if(document.hidden)setPlayback(false);});new ResizeObserver(resize).observe(canvas);reset();resize();requestAnimationFrame(frame);
 })();

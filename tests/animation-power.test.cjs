@@ -1,7 +1,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const context={Math};vm.createContext(context);vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation/power-result.js'),'utf8'),context);const P=context.PowerResult;
 function batch(seed,settings,target=0){
-  const messages=[],tasks=[],world={Math,Number,performance:{now:()=>0},setTimeout(fn){tasks.push(fn);},importScripts(url){assert.equal(url,'model.js?v=duration-pause-3');},postMessage(data){messages.push(JSON.parse(JSON.stringify(data)));}};
+  const messages=[],tasks=[],world={Math,Number,performance:{now:()=>0},setTimeout(fn){tasks.push(fn);},importScripts(url){assert.equal(url,'model.js?v=paced-histories-6');},postMessage(data){messages.push(JSON.parse(JSON.stringify(data)));}};
   vm.createContext(world);for(const name of ['model.js','power-worker.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation',name),'utf8'),world);
   const drain=()=>{let guard=0;while(tasks.length){assert(guard++<10000);tasks.shift()();}};
   world.onmessage({data:{type:'init',id:91,seed,settings}});drain();
@@ -36,4 +36,12 @@ test('the worker stops pending calculation on Pause, resumes the same batch, and
   assert.equal(JSON.stringify(a.messages.at(-1).points),JSON.stringify(batch(123,s,5).messages.at(-1).points));
   a.send({type:'pause'});a.send({type:'advance',generation:6,pauseAtTarget:true});a.drain();assert.equal(a.messages.at(-1).max,6);
   const count=a.messages.length;a.drain();assert.equal(a.messages.length,count);
+});
+
+
+test('each completed generation evaluates exactly 500 histories, with power equal to hits / 500',()=>{
+  const run=batch(732,{total:40,ratio:50,m:0,sample:10,loci:5},3),data=run.messages.at(-1);
+  assert.equal(data.reps,500);assert.equal(data.points.length,4);
+  for(const point of data.points){assert.equal(point.power,point.hits/500);assert(Number.isInteger(point.hits));assert(point.hits>=0&&point.hits<=500);}
+  assert(run.messages.some(x=>x.type==='progress'&&x.reps===500));
 });

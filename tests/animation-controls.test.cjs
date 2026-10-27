@@ -9,7 +9,7 @@ const vm=require('node:vm');
 function app(overrides={}){
   const elements=new Map(),listeners={},gradient={addColorStop(){}};
   const drawing=new Proxy({createLinearGradient:()=>gradient,createRadialGradient:()=>gradient},{get:(o,k)=>o[k]||(()=>{})});
-  const defaults={total:20000,ratio:50,migration:0,'sample-size':40,loci:50,speed:12,'travel-speed':1.3,'shark-design':'hammer',...overrides};
+  const defaults={total:20000,ratio:50,migration:0,'sample-size':40,loci:50,speed:6,'travel-speed':1.3,'shark-design':'hammer',...overrides};
   function element(id){
     if(!elements.has(id))elements.set(id,{value:String(defaults[id]??''),checked:false,disabled:false,hidden:false,style:{},options:[],textContent:'',attributes:{},
       setAttribute(name,value){this.attributes[name]=value;},addEventListener(){},
@@ -18,7 +18,15 @@ function app(overrides={}){
   }
   let time=1000,frame,scene,timerId=0,seed=100;const timers=new Map(),workers=[];
   const document={hidden:false,getElementById:element,createElement:()=>({getContext:()=>drawing}),addEventListener:(event,fn)=>{listeners[event]=fn;}};
-  const world={Math,Number,document,crypto:{getRandomValues(value){value[0]=++seed;return value;}},setTimeout:fn=>{timers.set(++timerId,fn);return timerId;},clearTimeout:id=>timers.delete(id),Worker:class{constructor(){workers.push(this);}postMessage(data){this.request=data;if(data.type==='init')this.initialRequest=data;}terminate(){this.terminated=true;}},devicePixelRatio:1,matchMedia:()=>({matches:false}),performance:{now:()=>time},
+  const world={Math,Number,document,crypto:{getRandomValues(value){value[0]=++seed;return value;}},setTimeout:fn=>{timers.set(++timerId,fn);return timerId;},clearTimeout:id=>timers.delete(id),Worker:class{
+      constructor(){workers.push(this);this.points=[];}
+      postMessage(data){
+        this.request=data;if(data.type==='init'){this.initialRequest=data;this.points=[{t:0,power:.05,hits:25}];}
+        if(data.type==='advance'){this.lastAdvance=data;this.points.push({t:data.generation,power:.05,hits:25});}
+        if(overrides.autoPower!==false&&(data.type==='init'||data.type==='advance'))this.onmessage({data:{id:data.id,max:data.generation??0,reps:500,points:this.points.map(p=>({...p}))}});
+      }
+      terminate(){this.terminated=true;}
+    },devicePixelRatio:1,matchMedia:()=>({matches:false}),performance:{now:()=>time},
     Path2D:class{constructor(){return drawing;}},ResizeObserver:class{observe(){}},requestAnimationFrame:fn=>{frame=fn;}};
   vm.createContext(world);
   for(const name of ['model.js','population-display.js','swim-motion.js','shark-character.js','ocean-scene.js','power-result.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation',name),'utf8'),world);
@@ -59,13 +67,14 @@ test('single-step stays paused, a hidden tab pauses both clocks, and Reset resto
 
 
 test('live power follows the clock, stays running after detection and reruns have fresh seeds',()=>{
-  const a=app();assert.equal(a.workers.length,0);a.click('split');const w=a.workers[0],id=w.request.id;
+  const a=app({autoPower:false});assert.equal(a.workers.length,0);a.click('split');const w=a.workers[0],id=w.request.id;
   assert.equal(w.request.type,'init');assert.equal(typeof w.request.seed,'number');
+  w.onmessage({data:{id,max:0,reps:500,points:[{t:0,power:.05,hits:25}]}});
   a.click('step');assert.equal(w.request.type,'advance');assert.equal(w.request.generation,1);
-  w.onmessage({data:{id,max:1,points:[{t:0,power:.05,hits:4},{t:1,power:.6,hits:48}]}});
+  w.onmessage({data:{id,max:1,points:[{t:0,power:.05,hits:25},{t:1,power:.6,hits:300}]}});
   assert.equal(a.element('power-time').textContent,'Not reached yet');
   a.click('step');
-  w.onmessage({data:{id,max:2,points:[{t:0,power:.05,hits:4},{t:1,power:.6,hits:48},{t:2,power:.85,hits:68}]}});
+  w.onmessage({data:{id,max:2,points:[{t:0,power:.05,hits:25},{t:1,power:.6,hits:300},{t:2,power:.85,hits:425}]}});
   assert.equal(a.element('power-time').textContent,'2');assert.equal(a.element('power-unit').hidden,false);assert.match(a.element('power-scene-time').textContent,/2 generations/);assert(!w.terminated);
   const seed=a.workers[0].initialRequest.seed;a.click('split');assert.notEqual(a.workers[1].request.seed,seed);
 });
@@ -102,14 +111,30 @@ test('isolated 100-individual live history fixes the ten displayed SNPs and keep
 
 
 test('Pause freezes queued power results and both charts; Resume applies them without changing the crossing number',()=>{
-  const a=app({total:100});a.click('split');const w=a.workers[0],id=w.initialRequest.id;
+  const a=app({total:100,autoPower:false});a.click('split');const w=a.workers[0],id=w.initialRequest.id;
+  w.onmessage({data:{id,max:0,reps:500,points:[{t:0,power:.05,hits:25}]}});
+  a.tick(30);w.onmessage({data:{id,max:1,reps:500,points:[{t:0,power:.05,hits:25},{t:1,power:.65,hits:325}]}});
   a.tick(30);a.click('play');assert.equal(w.request.type,'pause');
   const before={title:a.element('power-time').textContent,curve:a.element('power-chart').innerHTML,now:a.element('power-now').textContent,fst:a.element('fst-chart').innerHTML};
-  w.onmessage({data:{id,max:2,points:[{t:0,power:.05,hits:4},{t:1,power:.65,hits:52},{t:2,power:.9,hits:72}]}});
+  w.onmessage({data:{id,max:2,points:[{t:0,power:.05,hits:25},{t:1,power:.65,hits:325},{t:2,power:.9,hits:450}]}});
   a.tick(60);
   assert.deepEqual({title:a.element('power-time').textContent,curve:a.element('power-chart').innerHTML,now:a.element('power-now').textContent,fst:a.element('fst-chart').innerHTML},before);
   a.click('play');assert.equal(w.request.type,'resume');assert.equal(a.element('power-time').textContent,'2');
   a.tick(30);a.click('calculate-power');assert.equal(w.request.type,'pause');
   assert.equal(a.element('power-time').textContent,'2');assert.equal(a.element('power-unit').hidden,false);
   const paused=a.state();a.tick(60);assert.deepEqual(a.state(),paused);
+});
+
+
+test('generation playback waits for each 500-history estimate while the sharks keep swimming',()=>{
+  const a=app({total:20,autoPower:false});a.click('split');const w=a.workers[0],id=w.initialRequest.id;
+  assert.equal(w.initialRequest.settings.histories,500);
+  a.tick(120);assert.equal(Number(a.state().generation),0);
+  w.onmessage({data:{id,max:0,reps:500,points:[{t:0,power:.05,hits:25}]}});
+  a.tick(60);assert.equal(Number(a.state().generation),1);assert.equal(w.lastAdvance.generation,1);
+  const before=a.state();a.tick(60);assert.equal(Number(a.state().generation),1);assert.notEqual(a.state().animals,before.animals);
+  w.onmessage({data:{type:'progress',id,generation:1,done:250,reps:500}});assert.match(a.element('power-progress').textContent,/250 \/ 500/);
+  assert(a.element('step').disabled);
+  w.onmessage({data:{id,max:1,reps:500,points:[{t:0,power:.05,hits:25},{t:1,power:.1,hits:50}]}});
+  a.tick();assert.equal(Number(a.state().generation),2);a.tick(60);assert.equal(Number(a.state().generation),2);
 });
