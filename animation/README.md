@@ -1,6 +1,6 @@
 # GreyZone animation
 
-## [▶ Essai de nage des poissons](https://yacinebenchehida.github.io/GreyZone/fish-study.html)
+## [▶ Fish swimming study](https://yacinebenchehida.github.io/GreyZone/fish-study.html)
 
 A small visual study: four stylised surgeonfish seen from above, with a solo view, pause and three swimming speeds. This is the first step toward replacing the whale scene. [Movement and appearance notes](FISH_STUDY.md).
 

@@ -3,7 +3,7 @@
 'use strict';
 const canvas=document.getElementById('fish-sea'),c=canvas.getContext('2d');
 const reduced=matchMedia('(prefers-reduced-motion: reduce)');
-let w=1000,h=570,t=0,last=0,paused=reduced.matches,solo=false,pace=1,water;
+let w=1000,h=570,t=0,last=0,paused=reduced.matches,solo=false,pace=Number(document.getElementById('pace').value),water;
 const fish=Array.from({length:4},(_,i)=>({id:i,x:0,y:0,heading:0,bend:0,stroke:i*1.83,effort:1,scale:1,previousHeading:null}));
 const delta=(a,b)=>Math.atan2(Math.sin(b-a),Math.cos(b-a));
 function resize(){const b=canvas.getBoundingClientRect();w=b.width;h=b.height;const d=Math.min(2,devicePixelRatio||1);canvas.width=Math.round(w*d);canvas.height=Math.round(h*d);c.setTransform(d,0,0,d,0,0);makeWater();}
@@ -52,7 +52,7 @@ function frame(now){
   requestAnimationFrame(frame);
 }
 const pause=document.getElementById('pause'),group=document.getElementById('group');
-function sync(){pause.textContent=paused?'Reprendre':'Pause';pause.setAttribute('aria-pressed',String(paused));group.textContent=solo?'Voir le petit banc':'Voir un seul poisson';group.setAttribute('aria-pressed',String(solo));}
+function sync(){pause.textContent=paused?'Resume':'Pause';pause.setAttribute('aria-pressed',String(paused));group.textContent=solo?'Watch the school':'Watch one fish';group.setAttribute('aria-pressed',String(solo));}
 pause.onclick=()=>{paused=!paused;sync();};group.onclick=()=>{solo=!solo;sync();};
 document.getElementById('pace').onchange=e=>{pace=Number(e.target.value);};
 reduced.addEventListener('change',()=>{paused=reduced.matches;sync();});
