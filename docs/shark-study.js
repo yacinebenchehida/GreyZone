@@ -20,7 +20,7 @@ function frame(now){const dt=last?Math.min(.04,(now-last)/1000):0;last=now;if(!p
       let fx=0,fy=0;
       for(const b of shown)if(a!==b){const dx=a.x-b.x,dy=a.y-b.y,d=Math.hypot(dx,dy);if(d>0&&d<110*scale){const force=(110*scale-d)/(110*scale);fx+=dx/d*force*2;fy+=dy/d*force*2;}}
       const target=Math.atan2(goal.y-a.y,goal.x-a.x),desired=Math.atan2(Math.sin(target)+wall.y+fy,Math.cos(target)+wall.x+fx);
-      const turn=clamp(delta(a.heading,desired),-dt*2.2,dt*2.2);a.heading+=turn;a.bend+=(clamp(turn/Math.max(dt,.001)*.22,-.75,.75)-a.bend)*Math.min(1,dt*6);
+      const turn=clamp(delta(a.heading,desired),-dt*2.2,dt*2.2);a.heading+=turn;SharkCharacter.followTurn(a,dt,scale,speed);
       a.x+=Math.cos(a.heading)*speed*dt;a.y+=Math.sin(a.heading)*speed*dt;a.x=clamp(a.x,margin,w-margin);a.y=clamp(a.y,yMin,yMax);a.stroke+=dt*4.2;
     }
     c.save();c.translate(a.x+9,a.y+15);c.rotate(a.heading);c.scale(scale,scale*.42);const g=c.createRadialGradient(-12,0,1,-12,0,100);g.addColorStop(0,'#18556b40');g.addColorStop(1,'#18556b00');c.fillStyle=g;c.beginPath();c.arc(-12,0,100,0,Math.PI*2);c.fill();c.restore();

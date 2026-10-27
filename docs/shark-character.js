@@ -14,11 +14,48 @@ function contour(c,points){
   for(let i=0;i<points.length;i++){const p=points[i],q=points[(i+1)%points.length];c.quadraticCurveTo(p.x,p.y,(p.x+q.x)/2,(p.y+q.y)/2);}c.closePath();
 }
 function oval(c,x,y,rx,ry,fill){c.fillStyle=fill;c.beginPath();c.ellipse(x,y,rx,ry,0,0,TAU);c.fill();}
-function draw(c,animal,time=0,options={}){
-  const style=profiles[options.variant||animal.variant||'classic'],phase=animal.stroke||0,bend=animal.bend||0;
-  function spine(u){return{x:74-142*u,y:Math.pow(u,2.25)*(Math.sin(u*5.5-phase)*(3+(animal.effort||.8)*3)+bend*18)};}
+// Each rear section follows the preceding section's earlier heading.
+// Delay scales with body length and forward speed; the tail follows last.
+function followTurn(animal,dt,scale,speed){
+  const count=8,delta=(a,b)=>Math.atan2(Math.sin(b-a),Math.cos(b-a));
+  if(!animal.jointHeadings)animal.jointHeadings=Array(count).fill(animal.heading);
+  const previous=animal.jointHeadings.slice();
+  const delay=Math.max(.055,Math.min(.125,142*scale/Math.max(45,speed)/(count-1)*.72));
+  const blend=1-Math.exp(-dt/delay);
+  animal.jointHeadings[0]=animal.heading;
+  for(let i=1;i<count;i++){
+    const target=i===1?animal.heading:previous[i-1];
+    animal.jointHeadings[i]+=delta(animal.jointHeadings[i],target)*blend;
+  }
+  animal.turnPose=animal.jointHeadings.map((angle,i)=>{
+    const limit=.90*Math.pow(i/(count-1),.9);
+    return Math.max(-limit,Math.min(limit,delta(animal.heading,angle)));
+  });
+}
+function makeSpine(animal){
+  const phase=animal.stroke||0,pose=animal.turnPose,steps=64,base=[{x:74,y:0}];
+  function angle(u){
+    if(!pose)return -(animal.bend||0)*u*.65;
+    const v=Math.max(0,Math.min(pose.length-1,u*(pose.length-1))),i=Math.min(pose.length-2,Math.floor(v));
+    return pose[i]+(pose[i+1]-pose[i])*(v-i);
+  }
+  // Integrating constant-length sections bends the torso without stretching it.
+  for(let i=1;i<=steps;i++){
+    const a=angle((i-.5)/steps),last=base[i-1];
+    base.push({x:last.x-Math.cos(a)*142/steps,y:last.y-Math.sin(a)*142/steps});
+  }
+  const points=base.map((p,i)=>{
+    const u=i/steps,a=angle(u),wave=Math.pow(u,2.25)*Math.sin(u*5.5-phase)*(3+(animal.effort||.8)*3);
+    return {x:p.x-Math.sin(a)*wave,y:p.y+Math.cos(a)*wave};
+  });
+  function spine(u){const v=Math.max(0,u*steps),i=Math.min(steps-1,Math.floor(v)),f=v-i;return{x:points[i].x+(points[i+1].x-points[i].x)*f,y:points[i].y+(points[i+1].y-points[i].y)*f};}
   function basis(u){const p=spine(u),q=spine(u+.002);return{...p,a:Math.atan2(p.y-q.y,p.x-q.x)};}
   function at(u,r){const p=basis(u);return{x:p.x-Math.sin(p.a)*r,y:p.y+Math.cos(p.a)*r};}
+  return {spine,basis,at};
+}
+function draw(c,animal,time=0,options={}){
+  const style=profiles[options.variant||animal.variant||'classic'],phase=animal.stroke||0;
+  const {spine,basis,at}=makeSpine(animal);
   const upper=[],lower=[];for(let i=style.hammer?2:0;i<half.length;i++){const u=i/(half.length-1),r=half[i]*style.width;upper.push(at(u,-r));lower.push(at(u,r));}
   const body=[...upper,...lower.reverse()];
   c.save();c.translate(animal.x,animal.y);c.rotate(animal.heading||0);c.scale(animal.scale||1,animal.scale||1);c.lineJoin='round';c.lineCap='round';
@@ -58,5 +95,5 @@ function draw(c,animal,time=0,options={}){
   }
   c.restore();
 }
-root.SharkCharacter={draw,profiles};
+root.SharkCharacter={draw,profiles,followTurn,makeSpine};
 })(globalThis);

@@ -13,3 +13,7 @@ Shape references consulted (no external artwork is copied into the project):
 - [Hawaiʻi Sharks: anatomy and swimming](https://dlnr.hawaii.gov/sharks/about-sharks/anatomy/)
 - [NOAA Fisheries: shark identification, including blue shark](https://www.fisheries.noaa.gov/new-england-mid-atlantic/atlantic-highly-migratory-species/shark-identification-cooperative-shark)
 - [Monterey Bay Aquarium: blacktip reef shark](https://www.montereybayaquarium.org/animals-the-ocean/animals-a-to-z/blacktip-reef-shark)
+
+Turning uses eight delayed body headings: the head leads, each rear section follows the preceding section, and the tail follows last. Delay depends on displayed body length and travel speed. The renderer integrates constant-length sections, then adds the cruising wave perpendicular to the curved spine. The torso, fins, gills, eyes and tail share that spine. A turn gradually relaxes when the heading stabilises.
+
+Run `node --test tests/shark-motion.test.cjs` to check turn lag, straightening, finite geometry and approximate length preservation.
