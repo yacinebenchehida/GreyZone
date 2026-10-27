@@ -59,11 +59,16 @@ function draw(c,animal,time=0,options={}){
   c.save();contour(c,body);c.clip();
   for(const side of [-1,1]){c.beginPath();for(let i=0;i<50;i++){const u=.08+i/49*.81,ix=u*(half.length-1),lo=Math.floor(ix),r=(half[lo]+(half[Math.min(lo+1,half.length-1)]-half[lo])*(ix-lo))*style.width*.92,p=at(u,side*r);i?c.lineTo(p.x,p.y):c.moveTo(p.x,p.y);}c.strokeStyle='#eeeeee40';c.lineWidth=.8;c.stroke();}
   c.restore();
-  if(options.alleles){
-    for(let i=0;i<2;i++){
-      const p=at(.40+i*.06,0);oval(c,p.x,p.y,3.0,3.0,options.alleles[i]?'#29d1be':'#f6a183');
-      c.strokeStyle='#effff1';c.lineWidth=.8;c.stroke();
-      if(options.alleles[i]){c.strokeStyle='#216c75';c.lineWidth=.8;c.beginPath();c.moveTo(p.x-1.4,p.y-1.4);c.lineTo(p.x+1.4,p.y+1.4);c.stroke();}
+  // Each SNP is one small split-colour dot: one half per diploid gene copy.
+  // All dots move with the same body spine; the display is capped at ten SNPs.
+  if(options.snps){
+    const n=Math.min(10,options.snps.length);
+    for(let i=0;i<n;i++){
+      const p=at(n===1?.43:.23+i/(n-1)*.47,0),r=3.1,pair=options.snps[i];
+      for(let copy=0;copy<2;copy++){
+        c.fillStyle=pair[copy]?'#29d1be':'#f6a183';c.beginPath();c.moveTo(p.x,p.y);c.arc(p.x,p.y,r,copy?0:Math.PI,copy?Math.PI:TAU);c.closePath();c.fill();
+      }
+      c.strokeStyle='#effff1';c.lineWidth=.7;c.beginPath();c.arc(p.x,p.y,r,0,TAU);c.stroke();
     }
   }
   // Five short gill slits on each flank, behind the eyes.

@@ -6,7 +6,7 @@ Open `shark-study.html` to compare three top-view drawings: A, classic shark; B,
 
 `swim-motion.js` chooses random destinations throughout the available water and anticipates the boundaries. Targets expire, and are replaced before an animal reaches them, to avoid orbiting a point. Neither the shark preview nor the current main app follows a fixed loop or a basin-centred route. Randomness is seeded for reproducible development checks. Travel speed and body-wave cadence remain separate. The fish study is retained as an earlier coordinated-motion comparison.
 
-The main app uses grey sharks throughout. The earlier fish drawings remain in the standalone fish study. The numerical population model is unchanged.
+The main app uses grey sharks throughout. The earlier fish drawings remain in the standalone fish study. The numerical population model is unchanged. In the main app, population counts, migration intensity and optional SNP dots are now mapped to the model through population-display.js; the standalone design study remains separate.
 
 Shape references consulted (no external artwork is copied into the project):
 

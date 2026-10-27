@@ -21,12 +21,12 @@ function app(){
   const world={Math,Number,document,devicePixelRatio:1,matchMedia:()=>({matches:false}),performance:{now:()=>time},
     Path2D:class{constructor(){return drawing;}},ResizeObserver:class{observe(){}},requestAnimationFrame:fn=>{frame=fn;}};
   vm.createContext(world);
-  for(const name of ['model.js','swim-motion.js','shark-character.js','ocean-scene.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation',name),'utf8'),world);
+  for(const name of ['model.js','population-display.js','swim-motion.js','shark-character.js','ocean-scene.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation',name),'utf8'),world);
   const Scene=world.OceanScene;world.OceanScene=class extends Scene{constructor(...args){super(...args);scene=this;}};
   vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation/app.js'),'utf8'),world);
   const tick=(n=1)=>{for(let i=0;i<n;i++){time+=1000/60;frame(time);}};
   const click=id=>{assert(!element(id).disabled,`${id} should be enabled`);element(id).onclick();};
-  const state=()=>({generation:element('generation').textContent,clock:scene.clock,nextCross:scene.nextCross,animals:JSON.stringify(scene.animals),fst:element('fst-chart').innerHTML});
+  const state=()=>({generation:element('generation').textContent,clock:scene.clock,migrationBudget:scene.migrationBudget,animals:JSON.stringify(scene.animals),fst:element('fst-chart').innerHTML});
   return {element,tick,click,state,scene,visibility(hidden){document.hidden=hidden;listeners.visibilitychange();}};
 }
 

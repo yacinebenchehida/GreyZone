@@ -9,14 +9,14 @@ function scene(width=940,ratio=50,reduced=false){
   const ctx=new Proxy({createLinearGradient:()=>gradient,createRadialGradient:()=>gradient},{get:(o,k)=>o[k]||(()=>{})});
   const world={Math,Number,devicePixelRatio:1,document:{createElement:()=>({getContext:()=>ctx})},matchMedia:()=>({matches:reduced}),performance:{now:()=>0}};
   vm.createContext(world);
-  for(const name of ['model.js','swim-motion.js','shark-character.js','ocean-scene.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation',name),'utf8'),world);
+  for(const name of ['model.js','population-display.js','swim-motion.js','shark-character.js','ocean-scene.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation',name),'utf8'),world);
   const canvas={getContext:()=>ctx,getBoundingClientRect:()=>({width,height:540}),addEventListener(){},style:{}};
-  const s=new world.OceanScene(canvas);s.reset({ratio});s.assignSides();return s;
+  const s=new world.OceanScene(canvas);s.reset({total:200,ratio,loci:32,migrants:20});s.assignSides();return s;
 }
 
 for(const [width,ratio,migrants]of [[940,50,0],[370,10,0],[370,90,20],[940,50,20]]){
   test(`free swimming uses both basins and respects the barrier (${width}px, ${ratio}% west, Nm=${migrants})`,()=>{
-    const s=scene(width,ratio),state={split:true,migrants},visits=[new Set(),new Set()];let crossings=0;
+    const s=scene(width,ratio);s.settings.migrants=migrants;const state={split:true,migrants,generationRate:12},visits=[new Set(),new Set()];let crossings=0;
     for(let frame=0;frame<7200;frame++){
       const previous=s.animals.map(a=>a.side);s.clock+=1/60;s.update(1/60,state);
       s.animals.forEach((a,i)=>{
@@ -61,4 +61,24 @@ test('normal travel covers at least 14% of the open-water width per second, with
   }
   const normal=distance(3),fast=distance(4.5);
   assert(normal>=.14);assert(fast>normal*1.45);
+});
+
+test('the scene creates the requested scaled headcount and split, and starts more exchanges at higher migration',()=>{
+  const s=scene();
+  for(const total of [200,1000,20000,100000]){
+    s.reset({total,ratio:30,loci:32,migrants:0});s.assignSides();
+    assert.equal(s.animals.length,s.display.total);
+    assert.equal(s.animals.filter(a=>a.side===0).length,s.display.west);
+    if(total===200){assert.equal(s.animals.length,200);assert.equal(s.display.west,60);}
+  }
+  const starts=[];
+  for(const migrants of [0,1,5,20]){
+    s.reset({total:200,ratio:50,loci:32,migrants});s.assignSides();
+    for(let frame=0;frame<240;frame++){s.clock+=.05;s.update(.05,{split:true,migrants,generationRate:12});}
+    starts.push(s.migrationStarts);
+  }
+  assert.equal(starts[0],0);assert(starts[1]>0&&starts[1]<starts[2]&&starts[2]<starts[3]);
+  const stopped=s.migrationStarts;
+  for(let frame=0;frame<100;frame++){s.clock+=.05;s.update(.05,{split:true,migrants:20,generationRate:0});}
+  assert.equal(s.migrationStarts,stopped,'Stopped generation playback must not launch new migrants');
 });
