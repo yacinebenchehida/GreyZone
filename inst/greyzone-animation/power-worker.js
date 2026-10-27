@@ -1,0 +1,2 @@
+importScripts('model.js');
+onmessage=function(event){const {settings:s,id}=event.data,M=GreyModel,reps=80,step=5,max=400;const hits=Array(max/step+1).fill(0);for(let run=0;run<reps;run++){const evolve=M.rng(9301+run*721),observe=M.rng(73019+run*193);let pop=M.initial(s);for(let t=0;t<=max;t++){if(t%step===0&&M.sample(pop,s,observe).p<=.05)hits[t/step]++;if(t<max)pop=M.advance(pop,s,evolve);}if((run+1)%8===0)postMessage({id,done:run+1,reps,points:hits.map((k,i)=>({t:i*step,power:k/(run+1)})),complete:run+1===reps});}};
