@@ -6,7 +6,7 @@ const TAU=Math.PI*2,clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 class OceanScene{
   constructor(canvas){this.canvas=canvas;this.c=canvas.getContext('2d');this.w=1000;this.h=540;this.clock=0;this.last=0;this.wasSplit=false;this.raised=0;this.selected=-1;this.hover=-1;this.reduced=matchMedia('(prefers-reduced-motion: reduce)');canvas.addEventListener('pointermove',e=>{const b=canvas.getBoundingClientRect(),x=e.clientX-b.left,y=e.clientY-b.top;let best=34;this.hover=-1;for(const a of this.animals||[]){const d=Math.hypot(a.x*this.w-x,a.y*this.h-y);if(d<best){best=d;this.hover=a.id;}}canvas.style.cursor=this.hover<0?'default':'pointer';});canvas.addEventListener('pointerleave',()=>{this.hover=-1;});canvas.addEventListener('click',()=>{this.selected=this.selected===this.hover?-1:this.hover;});}
   reset(settings){
-    this.settings=settings;this.random=GreyModel.rng(settings.displaySeed??8102);this.wasSplit=false;this.raised=0;this.selected=-1;this.clock=0;this.last=0;this.migrationBudget=0;this.migrationStarts=0;this.nextMigration=0;this.markerCache=null;this.frozenKey=null;
+    this.settings=settings;this.random=GreyModel.rng(settings.displaySeed??8102);this.wasSplit=false;this.raised=0;this.selected=-1;this.clock=0;this.last=0;this.migrationBudget=0;this.migrationStarts=0;this.nextMigration=0;this.markerCache=null;this.markerReferences=[];this.frozenKey=null;
     this.travelPace=this.travelPace||1.3;
     this.display=GreyDisplay.summary(settings);
     const r=this.random,n=this.display.total,left=this.display.west;
@@ -101,7 +101,7 @@ class OceanScene{
     const old=this.markerCache;
     if(old&&old.generation===state.generation&&old.p1===state.p1&&old.p2===state.p2)return;
     const indices=GreyDisplay.markerIndices(state.p1.length);
-    this.markerCache={generation:state.generation,p1:state.p1,p2:state.p2,indices,data:GreyDisplay.markers(this.animals,[state.p1,state.p2],indices,this.settings.displaySeed||0)};
+    this.markerCache={generation:state.generation,p1:state.p1,p2:state.p2,indices,palettes:GreyDisplay.markerPalettes([state.p1,state.p2],indices,this.markerReferences),data:GreyDisplay.markers(this.animals,[state.p1,state.p2],indices,this.settings.displaySeed||0)};
   }
   markerCopies(a){return this.markerCache.data.get(a.id);}
   drawShark(a,state){
@@ -109,7 +109,7 @@ class OceanScene{
     c.save();c.translate(x+8,y+11);c.rotate(a.heading);c.scale(scale,scale*.43);
     const shadow=c.createRadialGradient(-15,0,3,-15,0,85);shadow.addColorStop(0,'#0b52674d');shadow.addColorStop(1,'#125b6e00');
     c.fillStyle=shadow;c.beginPath();c.arc(-15,0,85,0,TAU);c.fill();c.restore();
-    SharkCharacter.draw(c,{x,y,heading:a.heading,scale,stroke:a.stroke,effort:a.effort,bend:a.bend},this.clock,{variant:this.variant||'hammer',snps:state.markers?this.markerCopies(a):null});
+    SharkCharacter.draw(c,{x,y,heading:a.heading,scale,stroke:a.stroke,effort:a.effort,bend:a.bend},this.clock,{variant:this.variant||'hammer',snps:state.markers?this.markerCopies(a):null,snpPalettes:state.markers?this.markerCache.palettes:null});
     if(a.id===this.selected||a.id===this.hover){c.save();c.strokeStyle='#e3f8daaa';c.lineWidth=1;c.setLineDash([3,5]);c.beginPath();c.arc(x,y,48*scale,0,TAU);c.stroke();c.restore();}
   }
   drawPortrait(a,state){
@@ -117,7 +117,7 @@ class OceanScene{
     const x=clamp(a.x*this.w+25,w/2+12,this.w-w/2-12),y=clamp(a.y*this.h-195,95,this.h-h-55);
     c.save();c.shadowColor='#002e4a33';c.shadowBlur=12;c.shadowOffsetY=5;c.fillStyle='#f4f4e9fa';c.strokeStyle='#c3d8cb';c.lineWidth=1;c.beginPath();c.roundRect(x-w/2,y,w,h,14);c.fill();c.shadowBlur=0;c.shadowOffsetY=0;c.stroke();
     c.fillStyle='#31575c';c.font='12px Georgia, serif';c.textAlign='center';c.fillText((this.variant==='classic'?'A shark':'A hammerhead')+', up close',x,y+23);
-    SharkCharacter.draw(c,{x:x+18,y:y+137,scale:.90,heading:0,stroke:a.stroke,effort:a.effort,bend:a.bend},this.clock,{variant:this.variant||'hammer',snps:state.markers?this.markerCopies(a):null});
+    SharkCharacter.draw(c,{x:x+18,y:y+137,scale:.90,heading:0,stroke:a.stroke,effort:a.effort,bend:a.bend},this.clock,{variant:this.variant||'hammer',snps:state.markers?this.markerCopies(a):null,snpPalettes:state.markers?this.markerCache.palettes:null});
     c.fillStyle='#72877f';c.font='10px Arial, sans-serif';c.fillText(state.markers?`${this.markerCache.indices.length} of ${state.p1.length} SNPs · two halves = two copies`:'Click the shark again to close',x,y+h-14);c.restore();
   }
 

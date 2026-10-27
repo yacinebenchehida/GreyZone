@@ -64,3 +64,19 @@ test('unchanged frequencies keep identical dots, fixation has no mixed colours, 
   assert.equal(M.fst([0,1,0],[1,1,0]),1);
   const near=D.markers(animals,[[.95],[.05]],[0],123);assert.equal([...near.values()].flat(2).filter(Boolean).length,20);
 });
+
+
+test('fixed SNP colours align across loci in west, opposite fixation contrasts in east, and shared fixation is grey',()=>{
+  const frequencies=[[0,1,0,1],[1,0,0,1]],reference=[],indices=[0,1,2,3];
+  const styles=D.markerPalettes(frequencies,indices,reference);
+  for(let i=0;i<2;i++){
+    assert.equal(styles[i].colors[frequencies[0][i]],'#29d1be');
+    assert.equal(styles[i].colors[frequencies[1][i]],'#f6a183');
+  }
+  for(let i=2;i<4;i++){assert(styles[i].sharedFixed);assert.equal(styles[i].colors[0],styles[i].colors[1]);assert.equal(styles[i].colors[0],'#81908c');}
+  // Reintroduction does not abruptly revert the established reference.
+  const later=D.markerPalettes([[.1,.9,.1,.9],[.9,.1,.1,.9]],indices,reference);
+  assert.equal(later[0].colors[0],'#29d1be');assert.equal(later[1].colors[1],'#29d1be');
+  assert(!later[2].sharedFixed);assert(!later[3].sharedFixed);
+  assert.equal(M.fst(frequencies[0],frequencies[1]),1);
+});

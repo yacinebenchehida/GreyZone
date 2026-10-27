@@ -21,6 +21,16 @@ function sorting(frequencies){
   }
   return {fixed,opposite,total:frequencies[0].length};
 }
+// Re-label the two alleles consistently across both basins at each locus.
+// Once west fixes, retain that orientation until a later western fixation.
+function markerPalettes(frequencies,indices,reference=[]){
+  return indices.map(locus=>{
+    const west=frequencies[0][locus],east=frequencies[1][locus];
+    if(west===0||west===1)reference[locus]=Boolean(west);
+    const westAllele=reference[locus]??true,sharedFixed=(west===0||west===1)&&west===east;
+    return {westAllele,sharedFixed,colors:sharedFixed?['#81908c','#81908c']:westAllele?['#f6a183','#29d1be']:['#29d1be','#f6a183']};
+  });
+}
 function markers(animals,frequencies,indices,seed=0){
   const result=new Map(animals.map(a=>[a.id,indices.map(()=>[false,false])]));
   for(const side of [0,1]){
@@ -41,5 +51,5 @@ function markers(animals,frequencies,indices,seed=0){
   }
   return result;
 }
-root.GreyDisplay={count,summary,markerIndices,migrationRate,markers,sorting};
+root.GreyDisplay={count,summary,markerIndices,migrationRate,markers,markerPalettes,sorting};
 })(globalThis);

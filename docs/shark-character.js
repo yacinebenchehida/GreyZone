@@ -65,11 +65,11 @@ function draw(c,animal,time=0,options={}){
     const n=Math.min(10,options.snps.length);
     for(let i=0;i<n;i++){
       const rows=n>5,columns=rows?5:n,col=rows?i%5:i,row=rows?Math.floor(i/5):0;
-      const p=at(columns===1?.43:.24+col/(columns-1)*.37,rows?(row?5.6:-5.6):0),r=4.4,pair=options.snps[i];
+      const p=at(columns===1?.43:.24+col/(columns-1)*.37,rows?(row?5.6:-5.6):0),r=4.4,pair=options.snps[i],colors=options.snpPalettes?.[i]?.colors||['#f6a183','#29d1be'];
       if(pair[0]===pair[1]){
-        c.fillStyle=pair[0]?'#29d1be':'#f6a183';c.beginPath();c.arc(p.x,p.y,r,0,TAU);c.fill();
+        c.fillStyle=colors[Number(pair[0])];c.beginPath();c.arc(p.x,p.y,r,0,TAU);c.fill();
       }else for(let copy=0;copy<2;copy++){
-        c.fillStyle=pair[copy]?'#29d1be':'#f6a183';c.beginPath();c.moveTo(p.x,p.y);c.arc(p.x,p.y,r,copy?0:Math.PI,copy?Math.PI:TAU);c.closePath();c.fill();
+        c.fillStyle=colors[Number(pair[copy])];c.beginPath();c.moveTo(p.x,p.y);c.arc(p.x,p.y,r,copy?0:Math.PI,copy?Math.PI:TAU);c.closePath();c.fill();
       }
       c.strokeStyle='#f6fff5';c.lineWidth=1.05;c.beginPath();c.arc(p.x,p.y,r,0,TAU);c.stroke();
       if(pair[0]!==pair[1]){c.strokeStyle='#224f58';c.lineWidth=.65;c.beginPath();c.moveTo(p.x-r,p.y);c.lineTo(p.x+r,p.y);c.stroke();}
