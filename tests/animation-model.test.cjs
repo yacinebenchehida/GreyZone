@@ -1,9 +1,18 @@
 const test=require('node:test'),assert=require('node:assert/strict'),M=require('../animation/model.js');
-const settings={total:4000,ratio:50,migrants:0,sample:50,loci:32};
+const settings={total:4000,ratio:50,m:0,sample:50,loci:32};
 test('split sizes conserve total; initial frequencies match exactly and are representable',()=>{for(const total of [200,1000,4000,20000,100000])for(const ratio of [10,30,50,90]){const s={...settings,total,ratio},[n1,n2]=M.sizes(s),p=M.initial(s);assert.equal(n1+n2,total);assert.deepEqual(p.a,p.b);for(const x of p.a){assert.ok(Math.abs(x*2*n1-Math.round(x*2*n1))<1e-8);assert.ok(Math.abs(x*2*n2-Math.round(x*2*n2))<1e-8);}}});
 test('exact binomial sampler has expected moments, including large populations',()=>{for(const [n,p] of [[40,.01],[100,.5],[20000,.3],[200000,.5],[400,.99]]){const r=M.rng(n),reps=15000;let sum=0,sq=0;for(let i=0;i<reps;i++){const x=M.binomial(n,p,r);assert.ok(x>=0&&x<=n&&Number.isInteger(x));sum+=x;sq+=x*x;}const mean=sum/reps,v=sq/reps-mean*mean;assert.ok(Math.abs(mean-n*p)<6*Math.sqrt(n*p*(1-p)/reps));assert.ok(Math.abs(v/(n*p*(1-p))-1)<.07);}});
 test('drift is unbiased and stronger at smaller effective size',()=>{const reps=12000,r=M.rng(321),s={...settings,loci:1,total:200};const pop={a:[.5],b:[.5],generation:0};let sum=0,sq=0;for(let i=0;i<reps;i++){const p=M.advance(pop,s,r).a[0];sum+=p;sq+=(p-.5)**2;}assert.ok(Math.abs(sum/reps-.5)<.002);assert.ok(Math.abs(sq/reps/(.25/200)-1)<.06);});
-test('fixed boundaries stay fixed; migration can reintroduce an allele',()=>{let p={a:[0],b:[1],generation:0};const r=M.rng(9);const a=M.advance(p,{...settings,loci:1},r);assert.equal(a.a[0],0);assert.equal(a.b[0],1);const b=M.advance(p,{...settings,loci:1,migrants:100},r);assert.ok(b.a[0]>0&&b.b[0]<1);});
+test('fixed boundaries stay fixed; migration can reintroduce an allele',()=>{let p={a:[0],b:[1],generation:0};const r=M.rng(9);const a=M.advance(p,{...settings,loci:1},r);assert.equal(a.a[0],0);assert.equal(a.b[0],1);const b=M.advance(p,{...settings,loci:1,m:.1},r);assert.ok(b.a[0]>0&&b.b[0]<1);});
 test('chi-square tail and generation-zero false positives are calibrated in default design',()=>{assert.ok(Math.abs(M.gammaQ(.5,3.841458820694124/2)-.05)<1e-10);assert.ok(Math.abs(M.gammaQ(1,5.991464547107979/2)-.05)<1e-10);const r=M.rng(9),s={...settings,total:20000,sample:40},p=M.initial(s);let rejected=0;for(let i=0;i<2500;i++)if(M.sample(p,s,r).p<=.05)rejected++;assert.ok(rejected/2500>.025&&rejected/2500<.075);});
 test('large separation is detectable; sampling cannot change population state',()=>{const p={a:Array(32).fill(.1),b:Array(32).fill(.9),generation:100},before=JSON.stringify(p),x=M.sample(p,settings,M.rng(13));assert.ok(x.p<.00001);assert.equal(JSON.stringify(p),before);assert.equal(M.fst(Array(32).fill(.5),Array(32).fill(.5)),0);});
 test('heterozygosity decay follows diploid drift over many histories',()=>{const s={...settings,total:400,loci:16},r=M.rng(811);let sum=0;const initial=M.initial(s);for(let k=0;k<300;k++){let p=M.initial(s);for(let t=0;t<50;t++)p=M.advance(p,s,r);sum+=p.a.reduce((a,x)=>a+2*x*(1-x),0)/s.loci;}const h0=initial.a.reduce((a,x)=>a+2*x*(1-x),0)/s.loci,expected=h0*(1-1/400)**50;assert.ok(Math.abs(sum/300-expected)<.012);});
+
+
+
+test('m is a receiving gene-pool fraction, including unequal Ne, and must satisfy 0 ≤ m < 1',()=>{
+  const s={...settings,total:2000,ratio:10,loci:1,m:.1},pop={a:[1],b:[0],generation:0},r=M.rng(912);let a=0,b=0;
+  for(let i=0;i<2000;i++){const next=M.advance(pop,s,r);a+=next.a[0];b+=next.b[0];}
+  assert(Math.abs(a/2000-.9)<.003);assert(Math.abs(b/2000-.1)<.003);
+  for(const m of [-.01,1,2,NaN])assert.throws(()=>M.advance(pop,{...s,m},r),/Migration proportion/);
+});

@@ -3,6 +3,7 @@
 'use strict';
 function summary(data){
   if(!data||!data.complete)return {status:'pending'};
+  if(!data.points?.length)return {status:'unavailable'};
   const limit=data.max??data.points.at(-1).t,nullRate=data.points[0]?.power||0;
   if(nullRate>.12)return {status:'uncalibrated',limit,nullRate};
   const first=data.points.find(p=>p.power>=.8);

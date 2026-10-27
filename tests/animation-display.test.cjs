@@ -22,7 +22,7 @@ test('headcounts are exact up to 200, then increase gently while preserving the 
 
 test('each animal has one diploid dot per displayed SNP, capped at ten; fixed alleles and current frequencies are retained',()=>{
   for(const ratio of [10,50,90])for(const loci of [1,5,8,10,32,100]){
-    const s={total:200,ratio,loci,migrants:0},sizes=M.sizes(s),d=D.summary(s),indices=D.markerIndices(loci);
+    const s={total:200,ratio,loci,m:0},sizes=M.sizes(s),d=D.summary(s),indices=D.markerIndices(loci);
     const animals=Array.from({length:d.total},(_,id)=>({id,side:id<d.west?0:1}));
     assert.equal(indices.length,Math.min(10,loci));assert.equal(new Set(indices).size,indices.length);
     let pop=M.initial(s),r=M.rng(703);
@@ -38,7 +38,7 @@ test('each animal has one diploid dot per displayed SNP, capped at ten; fixed al
 });
 
 test('compressed marker frequencies remain within one gene copy of the numerical population',()=>{
-  const s={total:100000,ratio:30,loci:100,migrants:20},d=D.summary(s),indices=D.markerIndices(s.loci),pop=M.initial(s);
+  const s={total:100000,ratio:30,loci:100,m:.01},d=D.summary(s),indices=D.markerIndices(s.loci),pop=M.initial(s);
   const animals=Array.from({length:d.total},(_,id)=>({id,side:id<d.west?0:1})),data=D.markers(animals,[pop.a,pop.b],indices,0);
   for(const side of [0,1])for(let dot=0;dot<indices.length;dot++){
     const copies=animals.filter(a=>a.side===side).flatMap(a=>data.get(a.id)[dot]);
@@ -46,11 +46,21 @@ test('compressed marker frequencies remain within one gene copy of the numerical
   }
 });
 
-test('crossing rates respond to migration, population compression and generation playback; isolation and stopped time give no crossings',()=>{
-  const s={total:20000,ratio:50,migrants:0};assert.equal(D.migrationRate(s,12),0);
-  const rates=[1,5,20].map(migrants=>D.migrationRate({...s,migrants},12));assert(rates[0]<rates[1]&&rates[1]<rates[2]);
-  assert.equal(D.migrationRate({...s,migrants:20},0),0);
-  assert(D.migrationRate({...s,migrants:20},50)>rates[2]);
-  assert(D.migrationRate({...s,total:200,migrants:20},12)>rates[2]);
-  assert(D.migrationRate({...s,total:100000,migrants:20},12)<rates[2]);
+test('sparse crossing rates respond to m and playback, stay capped and are zero for isolation or stopped time',()=>{
+  const s={total:20000,ratio:50,m:0};assert.equal(D.migrationRate(s,12),0);
+  const rates=[.00001,.0001,.001].map(m=>D.migrationRate({...s,m},12));assert(rates[0]<rates[1]&&rates[1]<rates[2]);
+  assert.equal(D.migrationRate({...s,m:.01},0),0);
+  assert(D.migrationRate({...s,m:.001},50)>rates[2]);
+  assert(D.migrationRate({...s,total:200,m:.001},12)<rates[2]);
+  assert(D.migrationRate({...s,total:500000,m:.5},50)<=.2);
+});
+
+test('unchanged frequencies keep identical dots, fixation has no mixed colours, and FST=1 can include shared fixed alleles',()=>{
+  const animals=Array.from({length:20},(_,id)=>({id,side:id<10?0:1})),indices=[0,1,2],frequencies=[[0,1,.5],[1,1,.5]];
+  const first=D.markers(animals,frequencies,indices,123),later=D.markers(animals,frequencies.map(a=>a.slice()),indices,123);
+  assert.equal(JSON.stringify([...first]),JSON.stringify([...later]));
+  for(const a of animals){assert.deepEqual(Array.from(first.get(a.id)[0]),a.side?[true,true]:[false,false]);assert.deepEqual(Array.from(first.get(a.id)[1]),[true,true]);}
+  const sorted=D.sorting([[0,1,0],[1,1,0]]);assert.equal(sorted.fixed,3);assert.equal(sorted.opposite,1);
+  assert.equal(M.fst([0,1,0],[1,1,0]),1);
+  const near=D.markers(animals,[[.95],[.05]],[0],123);assert.equal([...near.values()].flat(2).filter(Boolean).length,20);
 });

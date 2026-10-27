@@ -6,7 +6,7 @@ const TAU=Math.PI*2,clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 class OceanScene{
   constructor(canvas){this.canvas=canvas;this.c=canvas.getContext('2d');this.w=1000;this.h=540;this.clock=0;this.last=0;this.wasSplit=false;this.raised=0;this.selected=-1;this.hover=-1;this.reduced=matchMedia('(prefers-reduced-motion: reduce)');canvas.addEventListener('pointermove',e=>{const b=canvas.getBoundingClientRect(),x=e.clientX-b.left,y=e.clientY-b.top;let best=34;this.hover=-1;for(const a of this.animals||[]){const d=Math.hypot(a.x*this.w-x,a.y*this.h-y);if(d<best){best=d;this.hover=a.id;}}canvas.style.cursor=this.hover<0?'default':'pointer';});canvas.addEventListener('pointerleave',()=>{this.hover=-1;});canvas.addEventListener('click',()=>{this.selected=this.selected===this.hover?-1:this.hover;});}
   reset(settings){
-    this.settings=settings;this.random=GreyModel.rng(8102);this.wasSplit=false;this.raised=0;this.selected=-1;this.clock=0;this.last=0;this.migrationBudget=0;this.migrationStarts=0;this.markerCache=null;this.frozenKey=null;
+    this.settings=settings;this.random=GreyModel.rng(settings.displaySeed??8102);this.wasSplit=false;this.raised=0;this.selected=-1;this.clock=0;this.last=0;this.migrationBudget=0;this.migrationStarts=0;this.nextMigration=0;this.markerCache=null;this.frozenKey=null;
     this.travelPace=this.travelPace||1.75;
     this.display=GreyDisplay.summary(settings);
     const r=this.random,n=this.display.total,left=this.display.west;
@@ -20,7 +20,7 @@ class OceanScene{
   }
   resize(){const b=this.canvas.getBoundingClientRect();this.w=b.width||1000;this.h=b.height||540;this.dpr=Math.min(2,devicePixelRatio||1);this.canvas.width=Math.round(this.w*this.dpr);this.canvas.height=Math.round(this.h*this.dpr);this.c.setTransform(this.dpr,0,0,this.dpr,0,0);this.makeWater();}
   coast(y,growth=1){const f=y/this.h;return {x:this.w*(.5+.027*Math.sin(f*5.6-.8)+.016*Math.sin(f*12+1)),half:this.w*(.043+.018*Math.sin(f*7+.3)**2+.018*Math.exp(-(((f-.27)/.17)**2)))*growth};}
-  gap(){const nm=this.settings.migrants||0;return {y:this.h*.565,half:this.h*(.053+.022*Math.min(1,Math.log1p(nm)/Math.log(21)))};}
+  gap(){const m=this.settings.m||0;return {y:this.h*.565,half:this.h*(.053+.022*Math.min(1,Math.log1p(m*1000)/Math.log(501)))};}
   landPath(c,y0,y1,growth,pad=0){const pts=[];for(let y=y0;y<=y1;y+=5)pts.push(y);pts.push(y1);c.beginPath();for(let i=0;i<pts.length;i++){const y=pts[i],b=this.coast(y,growth),jag=Math.sin(y*.071)*2+Math.cos(y*.123)*1.3,x=b.x-b.half-pad+jag*growth;i?c.lineTo(x,y):c.moveTo(x,y);}for(let i=pts.length-1;i>=0;i--){const y=pts[i],b=this.coast(y,growth),jag=Math.cos(y*.064)*2+Math.sin(y*.147)*1.5;c.lineTo(b.x+b.half+pad+jag*growth,y);}c.closePath();}
   makeWater(){const bg=document.createElement('canvas');bg.width=this.w;bg.height=this.h;const c=bg.getContext('2d'),w=this.w,h=this.h,g=c.createLinearGradient(0,0,w,h);g.addColorStop(0,'#217f94');g.addColorStop(.38,'#4bb7b5');g.addColorStop(.7,'#36a9b1');g.addColorStop(1,'#146a8d');c.fillStyle=g;c.fillRect(0,0,w,h);for(const [x,y,r,col] of [[.14,.23,.55,'#b5e4c733'],[.74,.68,.48,'#97d8c333'],[.95,.03,.35,'#14718b33'],[.2,.95,.3,'#1b778d33']]){const a=c.createRadialGradient(w*x,h*y,0,w*x,h*y,w*r);a.addColorStop(0,col);a.addColorStop(1,'#16889900');c.fillStyle=a;c.fillRect(0,0,w,h);}const random=GreyModel.rng(7721);for(let i=0;i<1350;i++){const x=random()*w,y=random()*h;c.strokeStyle=i%4?'#8ddbd30c':'#031f4211';c.lineWidth=.6+random();c.beginPath();c.moveTo(x,y);c.quadraticCurveTo(x+7,y-2,x+10+random()*22,y+random()*3);c.stroke();}this.water=bg;}
   assignSides(){
@@ -36,9 +36,9 @@ class OceanScene{
   update(dt,state){
     if(this.reduced.matches)return;
     const w=this.w,h=this.h,gap=this.gap(),animals=this.animals,pace=this.travelPace;
-    if(state.split&&this.clock-this.raised>1.7){
+    if(state.split&&this.clock-this.raised>1.7&&this.clock>=this.nextMigration&&!animals.some(a=>a.cross)){
       const rate=GreyDisplay.migrationRate(this.settings,state.generationRate||0);
-      this.migrationBudget=Math.min(2,this.migrationBudget+rate*dt);
+      this.migrationBudget=Math.min(1,this.migrationBudget+rate*dt);
       while(this.migrationBudget>=1){
         const pair=[];
         for(let side=0;side<2;side++){
@@ -49,7 +49,7 @@ class OceanScene{
         }
         if(pair.some(a=>!a))break;
         for(const a of pair)a.cross={side:1-a.side,stage:0};
-        this.migrationStarts+=2;this.migrationBudget--;
+        this.migrationStarts+=2;this.migrationBudget=0;this.nextMigration=this.clock+5;break;
       }
     }
     // A spatial grid keeps spacing local even with hundreds of representatives.
@@ -99,14 +99,14 @@ class OceanScene{
   }
   bounds(y,side){const b=this.coast(y);return side?[b.x+b.half+46,this.w-44]:[44,b.x-b.half-46];}
   drawWater(){const c=this.c,w=this.w,h=this.h,t=this.clock;c.drawImage(this.water,0,0,w,h);c.lineWidth=.8;for(let i=0;i<18;i++){const y=(i*.1637%1)*h+Math.sin(t*.2+i)*8,x=(i*.271%1)*w+Math.cos(t*.12+i)*15;c.strokeStyle='#b2efe51a';c.beginPath();c.moveTo(x-55,y);c.bezierCurveTo(x-20,y-9,x+12,y+9,x+70,y-1);c.stroke();}for(const s of this.sparks){const pulse=Math.max(0,Math.sin(t*.75+s.phase)-.65)/.35;if(pulse<=0)continue;c.fillStyle=`rgba(213,249,233,${pulse*.46})`;c.beginPath();c.ellipse(s.x*w,s.y*h,s.size*2.6,s.size*.45,-.2,0,TAU);c.fill();}}
-  drawLand(state,growth){const c=this.c,gap=this.gap(),parts=state.migrants?[[-15,gap.y-gap.half],[gap.y+gap.half,this.h+15]]:[[-15,this.h+15]];for(const [y0,y1] of parts){this.landPath(c,y0,y1,growth,22);c.fillStyle='#24b8af18';c.fill();this.landPath(c,y0,y1,growth,11);c.fillStyle='#58d3c145';c.fill();this.landPath(c,y0,y1,growth,4);c.fillStyle='#b3ebcf80';c.fill();this.landPath(c,y0,y1,growth);const gradient=c.createLinearGradient(this.w*.43,0,this.w*.58,0);gradient.addColorStop(0,'#d7bc7f');gradient.addColorStop(.2,'#eddaa4');gradient.addColorStop(.6,'#f4e5b5');gradient.addColorStop(1,'#d4bb83');c.fillStyle=gradient;c.shadowColor='#083b5233';c.shadowBlur=9;c.shadowOffsetY=4;c.fill();c.shadowBlur=0;c.shadowOffsetY=0;c.save();c.clip();for(let i=0;i<130;i++){const y=(i*.61803398875%1)*this.h;if(y<y0||y>y1)continue;const b=this.coast(y,growth),x=b.x+Math.sin(i*11.3)*b.half*.85;c.fillStyle=i%3?'#baaa6c22':'#faffd63a';c.beginPath();c.ellipse(x,y,2+i%4,1+i%3,.4,0,TAU);c.fill();}if(growth>.5){const alpha=(growth-.5)*2;c.globalAlpha=alpha;for(let i=0;i<12;i++){const y=(i*.618%1)*this.h;if(y<y0+20||y>y1-20)continue;const b=this.coast(y,growth),x=b.x+Math.sin(i*4)*b.half*.16;c.fillStyle=i%2?'#9aa96570':'#a6b66b66';c.beginPath();c.ellipse(x,y,b.half*.56,14+i%3*5,.2,0,TAU);c.fill();}}c.restore();c.lineWidth=1.2;c.strokeStyle='#f5fff3aa';for(const sign of [-1,1]){c.beginPath();for(let y=y0;y<=y1;y+=5){const b=this.coast(y,growth),x=b.x+sign*(b.half+7+Math.sin(this.clock*1.3+y*.03)*2);y===y0?c.moveTo(x,y):c.lineTo(x,y);}c.stroke();}}if(growth>.65){c.save();c.globalAlpha=(growth-.65)/.35;const y=this.h*.28,b=this.coast(y,growth);this.palm(b.x+7,y,Math.min(1.1,this.w/850));c.restore();}}
+  drawLand(state,growth){const c=this.c,gap=this.gap(),parts=state.m?[[-15,gap.y-gap.half],[gap.y+gap.half,this.h+15]]:[[-15,this.h+15]];for(const [y0,y1] of parts){this.landPath(c,y0,y1,growth,22);c.fillStyle='#24b8af18';c.fill();this.landPath(c,y0,y1,growth,11);c.fillStyle='#58d3c145';c.fill();this.landPath(c,y0,y1,growth,4);c.fillStyle='#b3ebcf80';c.fill();this.landPath(c,y0,y1,growth);const gradient=c.createLinearGradient(this.w*.43,0,this.w*.58,0);gradient.addColorStop(0,'#d7bc7f');gradient.addColorStop(.2,'#eddaa4');gradient.addColorStop(.6,'#f4e5b5');gradient.addColorStop(1,'#d4bb83');c.fillStyle=gradient;c.shadowColor='#083b5233';c.shadowBlur=9;c.shadowOffsetY=4;c.fill();c.shadowBlur=0;c.shadowOffsetY=0;c.save();c.clip();for(let i=0;i<130;i++){const y=(i*.61803398875%1)*this.h;if(y<y0||y>y1)continue;const b=this.coast(y,growth),x=b.x+Math.sin(i*11.3)*b.half*.85;c.fillStyle=i%3?'#baaa6c22':'#faffd63a';c.beginPath();c.ellipse(x,y,2+i%4,1+i%3,.4,0,TAU);c.fill();}if(growth>.5){const alpha=(growth-.5)*2;c.globalAlpha=alpha;for(let i=0;i<12;i++){const y=(i*.618%1)*this.h;if(y<y0+20||y>y1-20)continue;const b=this.coast(y,growth),x=b.x+Math.sin(i*4)*b.half*.16;c.fillStyle=i%2?'#9aa96570':'#a6b66b66';c.beginPath();c.ellipse(x,y,b.half*.56,14+i%3*5,.2,0,TAU);c.fill();}}c.restore();c.lineWidth=1.2;c.strokeStyle='#f5fff3aa';for(const sign of [-1,1]){c.beginPath();for(let y=y0;y<=y1;y+=5){const b=this.coast(y,growth),x=b.x+sign*(b.half+7+Math.sin(this.clock*1.3+y*.03)*2);y===y0?c.moveTo(x,y):c.lineTo(x,y);}c.stroke();}}if(growth>.65){c.save();c.globalAlpha=(growth-.65)/.35;const y=this.h*.28,b=this.coast(y,growth);this.palm(b.x+7,y,Math.min(1.1,this.w/850));c.restore();}}
   palm(x,y,size){const c=this.c;c.save();c.translate(x,y);c.scale(size,size);c.save();c.translate(17,20);c.rotate(-.25);c.fillStyle='#31553738';c.beginPath();for(let i=0;i<7;i++){const a=i/7*TAU;c.moveTo(0,0);c.quadraticCurveTo(Math.cos(a+.3)*29,Math.sin(a+.3)*29,Math.cos(a)*43,Math.sin(a)*43);c.quadraticCurveTo(Math.cos(a-.15)*20,Math.sin(a-.15)*20,0,0);}c.fill();c.restore();c.lineCap='round';c.strokeStyle='#806342';c.lineWidth=7;c.beginPath();c.moveTo(5,19);c.quadraticCurveTo(8,4,-1,-8);c.stroke();c.strokeStyle='#c6a268';c.lineWidth=3;c.beginPath();c.moveTo(3,17);c.quadraticCurveTo(6,4,-3,-7);c.stroke();c.translate(-2,-9);const sway=Math.sin(this.clock*.65)*.04;for(let i=0;i<7;i++){c.save();c.rotate(i/7*TAU+sway);c.fillStyle=i%2?'#4f8150':'#63975b';c.beginPath();c.moveTo(0,0);c.bezierCurveTo(7,-13,25,-16,42,-5);c.bezierCurveTo(24,-9,17,4,0,0);c.fill();c.strokeStyle='#a2b96a';c.lineWidth=.8;c.beginPath();c.moveTo(0,0);c.quadraticCurveTo(19,-11,42,-5);c.stroke();for(let j=1;j<6;j++){c.strokeStyle='#375e3b70';c.beginPath();c.moveTo(j*5,-j*.9);c.lineTo(j*5+4,-7-j*.4);c.stroke();}c.restore();}for(const [dx,dy] of [[-3,3],[4,2],[1,-4]]){c.fillStyle='#80603d';c.beginPath();c.arc(dx,dy,3.3,0,TAU);c.fill();c.fillStyle='#b68d52';c.beginPath();c.arc(dx-1,dy-1,1,0,TAU);c.fill();}c.restore();}
   prepareMarkers(state){
     if(!state.markers)return;
     const old=this.markerCache;
     if(old&&old.generation===state.generation&&old.p1===state.p1&&old.p2===state.p2)return;
     const indices=GreyDisplay.markerIndices(state.p1.length);
-    this.markerCache={generation:state.generation,p1:state.p1,p2:state.p2,indices,data:GreyDisplay.markers(this.animals,[state.p1,state.p2],indices,state.generation)};
+    this.markerCache={generation:state.generation,p1:state.p1,p2:state.p2,indices,data:GreyDisplay.markers(this.animals,[state.p1,state.p2],indices,this.settings.displaySeed||0)};
   }
   markerCopies(a){return this.markerCache.data.get(a.id);}
   drawShark(a,state){
@@ -126,7 +126,7 @@ class OceanScene{
     c.fillStyle='#72877f';c.font='10px Arial, sans-serif';c.fillText(state.markers?`${this.markerCache.indices.length} of ${state.p1.length} SNPs · two halves = two copies`:'Click the shark again to close',x,y+h-14);c.restore();
   }
 
-  draw(state){const now=performance.now()/1000,dt=this.last?Math.min(.05,now-this.last):0;this.last=now;if(!this.animals)return;const frozenKey=[state.split,state.generation,state.migrants,state.markers,this.selected,this.hover,this.variant,this.w,this.h].join('|');if(state.paused&&this.frozenKey===frozenKey)return;this.frozenKey=state.paused?frozenKey:null;if(!this.reduced.matches&&!state.paused)this.clock+=dt;if(state.split&&!this.wasSplit){this.raised=this.clock;this.assignSides();}if(!state.split)this.raised=0;this.wasSplit=state.split;if(!state.paused)this.update(dt,state);this.prepareMarkers(state);this.c.clearRect(0,0,this.w,this.h);this.drawWater();for(const a of this.animals)this.drawShark(a,state);if(state.split){const t=this.reduced.matches?1:clamp((this.clock-this.raised)/1.7,0,1),growth=1-(1-t)**3;this.drawLand(state,growth);}const selected=this.animals.find(a=>a.id===this.selected);if(selected)this.drawPortrait(selected,state);}
+  draw(state){const now=performance.now()/1000,dt=this.last?Math.min(.05,now-this.last):0;this.last=now;if(!this.animals)return;const frozenKey=[state.split,state.generation,state.m,state.markers,this.selected,this.hover,this.variant,this.w,this.h].join('|');if(state.paused&&this.frozenKey===frozenKey)return;this.frozenKey=state.paused?frozenKey:null;if(!this.reduced.matches&&!state.paused)this.clock+=dt;if(state.split&&!this.wasSplit){this.raised=this.clock;this.assignSides();}if(!state.split)this.raised=0;this.wasSplit=state.split;if(!state.paused)this.update(dt,state);this.prepareMarkers(state);this.c.clearRect(0,0,this.w,this.h);this.drawWater();for(const a of this.animals)this.drawShark(a,state);if(state.split){const t=this.reduced.matches?1:clamp((this.clock-this.raised)/1.7,0,1),growth=1-(1-t)**3;this.drawLand(state,growth);}const selected=this.animals.find(a=>a.id===this.selected);if(selected)this.drawPortrait(selected,state);}
 
 }
 root.OceanScene=OceanScene;
