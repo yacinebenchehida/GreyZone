@@ -3,7 +3,7 @@
 const canvas=document.getElementById('shark-sea'),c=canvas.getContext('2d'),reduced=matchMedia('(prefers-reduced-motion: reduce)');
 let w=1100,h=480,t=0,last=0,paused=reduced.matches,group=false,variant='classic',water;
 let seed=8124;function random(){let q=seed+=0x6D2B79F5;q=Math.imul(q^q>>>15,q|1);q^=q+Math.imul(q^q>>>7,q|61);return((q^q>>>14)>>>0)/4294967296;}
-const clamp=(x,a,b)=>Math.max(a,Math.min(b,x)),delta=(a,b)=>Math.atan2(Math.sin(b-a),Math.cos(b-a));
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const sharks=Array.from({length:3},(_,i)=>({x:w*(.32+i*.17),y:h*(i===1?.68:.40),heading:i*.9,stroke:i*1.7,bend:0,effort:.8,wanderTarget:null}));
 function paintWater(){const bg=document.createElement('canvas');bg.width=w;bg.height=h;const q=bg.getContext('2d'),g=q.createLinearGradient(0,0,w,h);g.addColorStop(0,'#258d9f');g.addColorStop(.45,'#55bdb9');g.addColorStop(1,'#207e9a');q.fillStyle=g;q.fillRect(0,0,w,h);for(let i=0;i<18;i++){const y=(i*.618%1)*h;q.strokeStyle='#ddf5dd16';q.lineWidth=.8;q.beginPath();q.moveTo(0,y);q.bezierCurveTo(w*.25,y-17,w*.6,y+16,w,y-4);q.stroke();}water=bg;}
 function resize(){const box=canvas.getBoundingClientRect(),oldW=w,oldH=h;w=box.width;h=box.height;const d=Math.min(2,devicePixelRatio||1);canvas.width=Math.round(w*d);canvas.height=Math.round(h*d);c.setTransform(d,0,0,d,0,0);for(const a of sharks){a.x=a.x/oldW*w;a.y=a.y/oldH*h;a.wanderTarget=null;}paintWater();renderCards();}
@@ -20,8 +20,8 @@ function frame(now){const dt=last?Math.min(.04,(now-last)/1000):0;last=now;if(!p
       let fx=0,fy=0;
       for(const b of shown)if(a!==b){const dx=a.x-b.x,dy=a.y-b.y,d=Math.hypot(dx,dy);if(d>0&&d<110*scale){const force=(110*scale-d)/(110*scale);fx+=dx/d*force*2;fy+=dy/d*force*2;}}
       const target=Math.atan2(goal.y-a.y,goal.x-a.x),desired=Math.atan2(Math.sin(target)+wall.y+fy,Math.cos(target)+wall.x+fx);
-      const turn=clamp(delta(a.heading,desired),-dt*2.2,dt*2.2);a.heading+=turn;SharkCharacter.followTurn(a,dt,scale,speed);
-      a.x+=Math.cos(a.heading)*speed*dt;a.y+=Math.sin(a.heading)*speed*dt;a.x=clamp(a.x,margin,w-margin);a.y=clamp(a.y,yMin,yMax);a.stroke+=dt*4.2;
+      FreeSwim.steer(a,desired,dt);SharkCharacter.followTurn(a,dt,scale,speed);
+      a.x+=Math.cos(a.heading)*speed*dt;a.y+=Math.sin(a.heading)*speed*dt;a.x=clamp(a.x,margin,w-margin);a.y=clamp(a.y,yMin,yMax);a.stroke+=dt*(4.5+a.effort*1.8);
     }
     c.save();c.translate(a.x+9,a.y+15);c.rotate(a.heading);c.scale(scale,scale*.42);const g=c.createRadialGradient(-12,0,1,-12,0,100);g.addColorStop(0,'#18556b40');g.addColorStop(1,'#18556b00');c.fillStyle=g;c.beginPath();c.arc(-12,0,100,0,Math.PI*2);c.fill();c.restore();
     SharkCharacter.draw(c,{...a,scale},t,{variant});

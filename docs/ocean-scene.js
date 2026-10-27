@@ -1,8 +1,8 @@
-/* Ocean with the classic grey shark. Swimming is decorative;
+/* Ocean with the grey sharks. Swimming is decorative;
    population genetics is calculated separately in model.js. */
 (function(root){
 'use strict';
-const TAU=Math.PI*2,clamp=(x,a,b)=>Math.max(a,Math.min(b,x)),angleDelta=(a,b)=>Math.atan2(Math.sin(b-a),Math.cos(b-a));
+const TAU=Math.PI*2,clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 class OceanScene{
   constructor(canvas){this.canvas=canvas;this.c=canvas.getContext('2d');this.w=1000;this.h=540;this.clock=0;this.last=0;this.wasSplit=false;this.raised=0;this.selected=-1;this.hover=-1;this.reduced=matchMedia('(prefers-reduced-motion: reduce)');canvas.addEventListener('pointermove',e=>{const b=canvas.getBoundingClientRect(),x=e.clientX-b.left,y=e.clientY-b.top;let best=34;this.hover=-1;for(const a of this.animals||[]){const d=Math.hypot(a.x*this.w-x,a.y*this.h-y);if(d<best){best=d;this.hover=a.id;}}canvas.style.cursor=this.hover<0?'default':'pointer';});canvas.addEventListener('pointerleave',()=>{this.hover=-1;});canvas.addEventListener('click',()=>{this.selected=this.selected===this.hover?-1:this.hover;});}
   reset(settings){
@@ -13,7 +13,7 @@ class OceanScene{
       const side=i<left?0:1;
       return {id:i,side,x:.08+r()*.84,y:.15+r()*.70,
         heading:r()*TAU,
-        phase:r()*TAU,stroke:r()*TAU,effort:.8,speed:.045+r()*.01,size:.87+r()*.18,turn:0,cross:null};
+        phase:r()*TAU,stroke:r()*TAU,effort:.8,speed:.045+r()*.01,size:.87+r()*.18,cross:null};
     });
     this.sparks=Array.from({length:90},()=>({x:r(),y:r(),phase:r()*TAU,size:.5+r()}));this.resize();
   }
@@ -47,21 +47,18 @@ class OceanScene{
     const snapshot=animals.map(a=>({...a}));
     for(const a of animals){
       const x=a.x*w,y=a.y*h,scale=this.actorScale(a),pad=Math.max(46,118*scale),yMin=Math.max(55,pad),yMax=h-Math.max(45,pad),boundsAt=yy=>this.waterBounds(yy,a,state.split);
-      a.effort=.7+.25*(.5+.5*Math.sin(this.clock*.45+a.phase));a.stroke+=dt*4.2;
-      if(a.settle){const q=a.settle;q.elapsed+=dt;const u=clamp(q.elapsed/1.45,0,1),ease=u*u*(3-2*u);a.x=q.from+(q.to-q.from)*ease;a.heading+=clamp(angleDelta(a.heading,q.to>q.from?0:Math.PI),-dt*4.4,dt*4.4);SharkCharacter.followTurn(a,dt,scale,a.speed*w*pace);if(u>=1)a.settle=null;continue;}
+      a.effort=.7+.25*(.5+.5*Math.sin(this.clock*.45+a.phase));a.stroke+=dt*(4.5+a.effort*1.8);
+      if(a.settle){const q=a.settle;q.elapsed+=dt;const u=clamp(q.elapsed/1.45,0,1),ease=u*u*(3-2*u);a.x=q.from+(q.to-q.from)*ease;FreeSwim.steer(a,q.to>q.from?0:Math.PI,dt);SharkCharacter.followTurn(a,dt,scale,a.speed*w*pace);if(u>=1)a.settle=null;continue;}
       const target=FreeSwim.goal(a,{x,y,speed:a.speed*w*pace,time:this.clock,random:this.random,bounds:boundsAt,yMin,yMax});
       let tx=target.x,ty=target.y;
-      let fx=0,fy=0,ax=0,ay=0,near=0,space=1;
+      let fx=0,fy=0;
       for(const b of snapshot){
         if(a.id===b.id||(state.split&&a.side!==b.side)||a.cross||b.cross||b.settle)continue;
         const dx=x-b.x*w,dy=y-b.y*h,d=Math.hypot(dx,dy);
-        if(d>0&&d<65){const force=(65-d)/65;fx+=dx/d*force*3.3;fy+=dy/d*force*3.3;}
-        if(d>0&&d<95&&(-dx*Math.cos(a.heading)-dy*Math.sin(a.heading))/d>.6)space=Math.min(space,clamp((d-24)/65,.35,1));
-        if(d>=65&&d<125){ax+=Math.cos(b.heading);ay+=Math.sin(b.heading);near++;}
+        const spacing=70*scale;
+        if(d>0&&d<spacing){const force=(spacing-d)/spacing;fx+=dx/d*force*.65;fy+=dy/d*force*.65;}
       }
-      // Mild local alignment, without a shared destination or circular course.
-      if(near){fx+=ax/near*.06;fy+=ay/near*.06;}
-      let desired=Math.atan2(ty-y,tx-x),speed=a.speed*w*pace*space;
+      let desired=Math.atan2(ty-y,tx-x),speed=a.speed*w*pace;
       if(a.cross){
         const sign=a.cross.side?1:-1,coast=this.coast(gap.y),clearance=Math.max(58,pad+12),entry=coast.x-sign*(coast.half+clearance),exit=coast.x+sign*(coast.half+clearance);
         ty=gap.y;
@@ -73,11 +70,8 @@ class OceanScene{
         fx+=wall.x;fy+=wall.y;
         desired=Math.atan2(Math.sin(desired)+fy,Math.cos(desired)+fx);
       }
-      const difference=angleDelta(a.heading,desired),turn=clamp(difference,-dt*4.4,dt*4.4);
-      a.heading+=turn;
+      FreeSwim.steer(a,desired,dt);
       SharkCharacter.followTurn(a,dt,scale,speed);
-      const bend=dt?clamp(turn/dt*.16,-.85,.85):0;
-      a.turn+=(bend-a.turn)*Math.min(1,dt*7);
       // Body-wave cadence is independent of travel speed.
       a.x+=Math.cos(a.heading)*speed*dt/w;a.y+=Math.sin(a.heading)*speed*dt/h;
       a.y=clamp(a.y,yMin/h,yMax/h);
@@ -103,15 +97,15 @@ class OceanScene{
     c.save();c.translate(x+8,y+11);c.rotate(a.heading);c.scale(scale,scale*.43);
     const shadow=c.createRadialGradient(-15,0,3,-15,0,85);shadow.addColorStop(0,'#0b52674d');shadow.addColorStop(1,'#125b6e00');
     c.fillStyle=shadow;c.beginPath();c.arc(-15,0,85,0,TAU);c.fill();c.restore();
-    SharkCharacter.draw(c,{x,y,heading:a.heading,scale,stroke:a.stroke,effort:a.effort,turnPose:a.turnPose},this.clock,{alleles:state.markers?this.markerCopies(a,state):null});
+    SharkCharacter.draw(c,{x,y,heading:a.heading,scale,stroke:a.stroke,effort:a.effort,bend:a.bend},this.clock,{variant:this.variant||'hammer',alleles:state.markers?this.markerCopies(a,state):null});
     if(a.id===this.selected||a.id===this.hover){c.save();c.strokeStyle='#e3f8daaa';c.lineWidth=1;c.setLineDash([3,5]);c.beginPath();c.arc(x,y,48*scale,0,TAU);c.stroke();c.restore();}
   }
   drawPortrait(a,state){
     const c=this.c,w=Math.min(290,this.w-24),h=260;
     const x=clamp(a.x*this.w+25,w/2+12,this.w-w/2-12),y=clamp(a.y*this.h-195,95,this.h-h-55);
     c.save();c.shadowColor='#002e4a33';c.shadowBlur=12;c.shadowOffsetY=5;c.fillStyle='#f4f4e9fa';c.strokeStyle='#c3d8cb';c.lineWidth=1;c.beginPath();c.roundRect(x-w/2,y,w,h,14);c.fill();c.shadowBlur=0;c.shadowOffsetY=0;c.stroke();
-    c.fillStyle='#31575c';c.font='12px Georgia, serif';c.textAlign='center';c.fillText('A shark, up close',x,y+23);
-    SharkCharacter.draw(c,{x:x+18,y:y+137,scale:.90,heading:0,stroke:a.stroke,effort:a.effort,turnPose:a.turnPose},this.clock,{alleles:state.markers?this.markerCopies(a,state):null});
+    c.fillStyle='#31575c';c.font='12px Georgia, serif';c.textAlign='center';c.fillText((this.variant==='classic'?'A shark':'A hammerhead')+', up close',x,y+23);
+    SharkCharacter.draw(c,{x:x+18,y:y+137,scale:.90,heading:0,stroke:a.stroke,effort:a.effort,bend:a.bend},this.clock,{variant:this.variant||'hammer',alleles:state.markers?this.markerCopies(a,state):null});
     c.fillStyle='#72877f';c.font='10px Arial, sans-serif';c.fillText(state.markers?'Two copies of one neutral marker':'Click the shark again to close',x,y+h-14);c.restore();
   }
 

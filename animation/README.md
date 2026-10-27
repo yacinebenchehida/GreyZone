@@ -2,7 +2,7 @@
 
 ## [▶ Open GreyZone](https://yacinebenchehida.github.io/GreyZone/)
 
-Raise the barrier, press **Play**, then **Take a genetic sample**. Classic grey sharks swim freely through the main scene, with their bodies bending into turns. You can change population sizes, the split ratio, migration, sample size and marker count.
+Raise the barrier, press **Play**, then **Take a genetic sample**. Hammerhead sharks swim freely through the main scene, using the earlier fish’s travelling body wave and smooth steering. The **Animal** menu also offers the classic grey shark, without restarting the experiment. You can change population sizes, the split ratio, migration, sample size and marker count.
 
 **Travel speed** controls how quickly the sharks move through the water. **Generations** controls simulation playback. Use **Shark close-up** to inspect an animal, or enable **Show gene copies** for the two-copy neutral-marker overlay.
 

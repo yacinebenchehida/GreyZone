@@ -4,33 +4,44 @@ const fs=require('node:fs');
 const path=require('node:path');
 const vm=require('node:vm');
 const context={Math};vm.createContext(context);
-vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation/shark-character.js'),'utf8'),context);
+for(const name of ['shark-character.js','swim-motion.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation',name),'utf8'),context);
 const {followTurn,makeSpine}=context.SharkCharacter;
 const delta=(a,b)=>Math.atan2(Math.sin(b-a),Math.cos(b-a));
 
-test('rear body sections lag behind the head in a turn and relax afterward',()=>{
-  const shark={heading:0,stroke:0,effort:.8};
-  for(let i=0;i<60;i++)followTurn(shark,1/60,1.3,170);
-  for(let i=0;i<30;i++){shark.heading+=2/60;followTurn(shark,1/60,1.3,170);}
-  assert.equal(shark.turnPose[0],0);
-  assert(Math.abs(shark.turnPose[3])>.15,'The torso should visibly bend');
-  assert(Math.abs(shark.turnPose[7])>Math.abs(shark.turnPose[3]),'The tail should follow later');
-  assert(Math.abs(delta(shark.jointHeadings[7],shark.heading))>.4);
-  const turning=makeSpine(shark),straight=makeSpine({...shark,turnPose:undefined,bend:0});
-  assert(Math.abs(turning.spine(1).y-straight.spine(1).y)>25,'The bend should move the tail visibly away from a rigid rotation');
-  for(let i=0;i<180;i++)followTurn(shark,1/60,1.3,170);
-  assert(Math.max(...shark.turnPose.map(Math.abs))<.01,'The body should gradually straighten');
+test('the whole body bends through a turn, then eases back into a straight cruise',()=>{
+  for(const sign of [-1,1]){
+    const shark={heading:0,stroke:0,effort:.8};followTurn(shark,0,1.3,170);
+    for(let i=0;i<30;i++){shark.heading+=sign*1.5/60;followTurn(shark,1/60,1.3,170);}
+    const turning=makeSpine(shark),straight=makeSpine({...shark,bend:0});
+    assert(Math.abs(turning.spine(.5).y-straight.spine(.5).y)>3,'The middle of the body should bend too');
+    assert(sign*(turning.spine(1).y-straight.spine(1).y)>15,'The rear body should trail the turning head');
+    const before=shark.bend;followTurn(shark,1/60,1.3,170);
+    assert(Math.abs(shark.bend)>.8*Math.abs(before),'The bend should relax rather than snap straight');
+    for(let i=0;i<180;i++)followTurn(shark,1/60,1.3,170);
+    assert(Math.abs(shark.bend)<.01);
+  }
 });
 
-test('sharp turns keep the spine finite, attached at the head, and approximately constant in length',()=>{
-  for(const sign of [-1,1])for(const scale of [.3,.65,1.4])for(const rate of [2.2,4.4]){
-    const shark={heading:0,stroke:.9,effort:.8};followTurn(shark,0,scale,180);
-    for(let frame=0;frame<120;frame++){
-      shark.heading+=sign*rate/60;followTurn(shark,1/60,scale,180);
-      const rig=makeSpine(shark),head=rig.spine(0);assert.equal(head.x,74);assert.equal(head.y,0);
-      let length=0,previous=head;
-      for(let i=1;i<=100;i++){const p=rig.spine(i/100);assert(Number.isFinite(p.x+p.y+rig.basis(i/100).a));length+=Math.hypot(p.x-previous.x,p.y-previous.y);previous=p;}
-      assert(length>138&&length<148,'Turning should bend, not stretch, the body');
-    }
+test('the cruising wave has a steady head, a moving torso and a sweeping attached tail',()=>{
+  const a=makeSpine({stroke:0,effort:.8}),b=makeSpine({stroke:Math.PI,effort:.8});
+  assert(Math.hypot(a.spine(0).x-b.spine(0).x,a.spine(0).y-b.spine(0).y)<1e-12);
+  const shoulder=Math.abs(a.spine(.25).y-b.spine(.25).y),body=Math.abs(a.spine(.75).y-b.spine(.75).y);
+  assert(body>shoulder*2);
+  for(const bend of [-.72,0,.72])for(let stroke=0;stroke<7;stroke+=.3){
+    const rig=makeSpine({stroke,effort:1,bend});let previous=rig.spine(0),length=0;
+    for(let i=1;i<=100;i++){const p=rig.spine(i/100);assert(Number.isFinite(p.x+p.y+rig.basis(i/100).a));length+=Math.hypot(p.x-previous.x,p.y-previous.y);previous=p;}
+    assert(length>=142&&length<160,'The body should remain continuous without collapsing or stretching excessively');
   }
+});
+
+test('a sudden destination change cannot produce an instant pivot or reverse the turn rate',()=>{
+  const shark={heading:0};let previous=0;
+  for(let i=0;i<180;i++){
+    const before=shark.heading,desired=i<60?2:-2;
+    context.FreeSwim.steer(shark,desired,1/60);
+    assert(Math.abs(shark.heading-before)<=2.2/60+1e-9);
+    assert(Math.abs(shark.turnRate-previous)<=6/60+1e-9);
+    previous=shark.turnRate;
+  }
+  assert(Math.abs(delta(shark.heading,-2))<.06,'The shark should settle on its new heading');
 });
