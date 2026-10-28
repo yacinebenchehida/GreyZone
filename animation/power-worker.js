@@ -1,5 +1,5 @@
 // Study resampling of the exact live population pair; no demographic simulation.
-importScripts('model.js?v=snp-explorer-11');
+importScripts('model.js?v=sea-life-12');
 let batch=null;
 onmessage=function(event){
   const message=event.data;

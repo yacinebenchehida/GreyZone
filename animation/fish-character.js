@@ -63,6 +63,11 @@ function draw(c,fish,time,options={}){
       if(options.alleles[i]){c.strokeStyle='#216c75';c.lineWidth=.8;c.beginPath();c.moveTo(p.x-1.4,p.y-1.4);c.lineTo(p.x+1.4,p.y+1.4);c.stroke();}
     }
   }
+  // Optional neutral-marker overlay for the population animation.
+  if(options.snps){
+    const n=Math.min(10,options.snps.length),cols=n>5?5:n;
+    for(let i=0;i<n;i++){const p=point(cols===1?.4:.25+(i%cols)/(cols-1)*.35,n>5?(i<5?-5.5:5.5):0);SharkCharacter.drawMarker(c,p.x,p.y,3.35,options.snps[i],options.snpPalettes?.[i]);}
+  }
   // Two small lateral eyes and gill covers give the head a finished shape.
   for(const side of [-1,1]){
     const p=point(.105,side*7.1);

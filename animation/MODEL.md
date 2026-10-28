@@ -50,3 +50,9 @@ Background: Bailleul et al. (2018), doi:10.1111/eva.12591; Ben Chehida et al. (2
 ## Full SNP frequency view
 
 All selected loci are listed in stable index order, with paired west/east allele-A frequency bars per SNP. The panel uses a scrollable two-column layout (one column on narrow phones), marks the ten displayed dot indices, and can filter to loci still segregating within at least one basin. Summary counts are computed before filtering. Exact 0/1 frequencies determine fixation. Unfixed near-endpoint frequencies use <0.01% or >99.99% labels. Display filters do not alter population frequencies, study samples, FST, or stopping. Rendering is cached for the current population snapshot and filter, so completing study resampling does not rebuild an unchanged list.
+
+## Decorative species and emergence
+
+`marine-life.js` dispatches Hammerhead and Classic shark straight to the accepted `SharkCharacter.draw` renderer, without replacing its body, wave or turn code. Blue tang reuses `FishCharacter.draw`; the only addition to that renderer is an optional SNP overlay. Turtle front flippers use a slower rowing cycle, tuna use a tail-led wave, orca flukes foreshorten during a vertical stroke, and seals flex the posterior body. These are illustrations, not species-specific demographic models. All species share the existing free-swimming routes, containment, headcounts, migration schedule and genetic model. Selecting an animal changes neither the run nor its RNG streams.
+
+`island-scene.js` stages a 4.8-second emergence and caches its static terrain once settled. The existing coast and gap functions remain authoritative; inset curves soften the visible channel banks. Surf, palm fronds and new animal effects read only the scene clock. They create no independent timers or animation loops. Reduced motion draws the completed land immediately.

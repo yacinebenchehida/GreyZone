@@ -10,7 +10,14 @@ function freshSeed(){
   return (value[0]^Math.imul(++seedCounter,2654435761))>>>0;
 }
 function stopWorker(){if(worker)worker.terminate();worker=null;job++;}
-function prepareActors(){ocean.reset(s);ocean.travelPace=Number($('travel-speed').value);ocean.variant=$('shark-design').value;const d=ocean.display;$('shown-west').textContent=number(d.west)+' sharks shown';$('shown-east').textContent=number(d.east)+' sharks shown';$('display-scale').textContent=number(d.total)+' sharks shown · '+(d.exact?'1 shark = 1 individual':'1 shark ≈ '+number(Math.round(d.weight))+' individuals')+' · SNP display: '+Math.min(10,s.loci)+' of '+s.loci+' markers';}
+function animalLabels(){
+  const d=ocean.display,kind=SeaLife.info(ocean.variant);
+  $('shown-west').textContent=number(d.west)+' '+kind.plural+' shown';$('shown-east').textContent=number(d.east)+' '+kind.plural+' shown';
+  $('display-scale').textContent=number(d.total)+' '+kind.plural+' shown · '+(d.exact?'1 animal = 1 individual':'1 animal ≈ '+number(Math.round(d.weight))+' individuals')+' · SNP display: '+Math.min(10,s.loci)+' of '+s.loci+' markers';
+  $('scene').setAttribute('aria-label',`An ocean seen from above, with ${kind.plural} swimming. A sandy landmass rises to separate the populations, with coconut palms on it.`);
+}
+function prepareActors(){ocean.reset(s);ocean.travelPace=Number($('travel-speed').value);ocean.variant=$('shark-design').value;animalLabels();}
+
 function reset(){
   stopClocks();stopWorker();s=settings();runSeed=freshSeed();s.displaySeed=runSeed^0x6179a3bd;
   const [n1,n2]=M.sizes(s),cap=Math.min(150,n1,n2);
@@ -110,7 +117,7 @@ function showPowerResult(){
 function acceptPower(data){power=data;completedThrough=Math.max(completedThrough,data.max);progress=null;if(isFixed()){finished=true;running=false;paused=true;accumulator=0;stopClocks();if(worker)worker.postMessage({type:'pause',id:job});}sync();}
 function calculatePower(){
   stopWorker();power=null;pendingPower=null;progress=null;pendingProgress=null;completedThrough=-1;stepPowerTarget=null;const id=job;
-  try{worker=new Worker('power-worker.js?v=snp-explorer-11');}catch(err){running=false;paused=true;sync();$('power-time').textContent='Power unavailable';return;}
+  try{worker=new Worker('power-worker.js?v=sea-life-12');}catch(err){running=false;paused=true;sync();$('power-time').textContent='Power unavailable';return;}
   worker.onmessage=event=>{
     const data=event.data;if(data.id!==job)return;
     if(data.type==='progress'){if(paused&&stepPowerTarget===null){pendingProgress=data;return;}progress=data;showPowerResult();return;}
@@ -155,5 +162,5 @@ function frame(now){animationFrame=null;if(document.hidden||paused)return;advanc
 function backgroundTick(){backgroundTimer=null;if(document.hidden&&running){advanceClock(performance.now());ensureBackgroundClock();}}
 function ensureBackgroundClock(){if(document.hidden&&running&&backgroundTimer===null)backgroundTimer=setTimeout(backgroundTick,100);}
 
-$('shark-design').onchange=()=>{ocean.variant=$('shark-design').value;drawScene();};$('travel-speed').onchange=()=>{ocean.travelPace=Number($('travel-speed').value);};$('segregating-only').onchange=renderSnps;$('show-markers').onchange=drawScene;ocean.onInspect=()=>{if(paused)drawScene();};$('meet-shark').onclick=()=>{ocean.selected=ocean.selected<0?1:-1;drawScene();};$('split').onclick=startRun;$('play').onclick=togglePlayback;$('step').onclick=singleStep;$('reset').onclick=reset;$('take-sample').onclick=takeSample;$('calculate-power').onclick=togglePower;for(const id of ['total','ratio','migration','sample-size','loci'])$(id).addEventListener('change',reset);$('ratio').addEventListener('input',()=>$('ratio-out').textContent=$('ratio').value+'%');$('sample-size').addEventListener('input',()=>$('sample-out').textContent=$('sample-size').value);document.addEventListener('visibilitychange',()=>{stopClocks();scheduleFrame();ensureBackgroundClock();});new ResizeObserver(resize).observe(canvas);reset();resize();
+$('shark-design').onchange=()=>{ocean.variant=$('shark-design').value;animalLabels();drawScene();};$('travel-speed').onchange=()=>{ocean.travelPace=Number($('travel-speed').value);};$('segregating-only').onchange=renderSnps;$('show-markers').onchange=drawScene;ocean.onInspect=()=>{if(paused)drawScene();};$('meet-shark').onclick=()=>{ocean.selected=ocean.selected<0?1:-1;drawScene();};$('split').onclick=startRun;$('play').onclick=togglePlayback;$('step').onclick=singleStep;$('reset').onclick=reset;$('take-sample').onclick=takeSample;$('calculate-power').onclick=togglePower;for(const id of ['total','ratio','migration','sample-size','loci'])$(id).addEventListener('change',reset);$('ratio').addEventListener('input',()=>$('ratio-out').textContent=$('ratio').value+'%');$('sample-size').addEventListener('input',()=>$('sample-out').textContent=$('sample-size').value);document.addEventListener('visibilitychange',()=>{stopClocks();scheduleFrame();ensureBackgroundClock();});new ResizeObserver(resize).observe(canvas);reset();resize();
 })();

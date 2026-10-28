@@ -34,3 +34,5 @@ header,main,footer{max-width:1520px}.intro{padding:32px 0 28px}h1{font-size:62px
 .explainer{grid-template-columns:1fr;gap:10px}.explainer>div:last-child{max-width:950px}
 
 .snp-grid:focus-visible{outline:2px solid #73998f;outline-offset:3px}
+
+.sim-intro{padding:27px 0 25px}.sim-intro h1{font:normal clamp(26px,3vw,37px)/1.15 Georgia,serif;letter-spacing:-.7px;margin:0 0 9px}.sim-intro p{font-size:14px;color:#607a79;max-width:800px;margin:0}.sea-caption{justify-content:flex-end}header{height:76px}@media(max-width:720px){.sim-intro{padding:22px 0}.sim-intro p{font-size:12px}}

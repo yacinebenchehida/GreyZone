@@ -29,7 +29,7 @@ function app(overrides={}){
     },devicePixelRatio:1,matchMedia:()=>({matches:false}),performance:{now:()=>time},
     Path2D:class{constructor(){return drawing;}},ResizeObserver:class{observe(){}},requestAnimationFrame:fn=>{frames.set(++frameId,fn);return frameId;},cancelAnimationFrame:id=>frames.delete(id)};
   vm.createContext(world);
-  for(const name of ['model.js','population-display.js','swim-motion.js','shark-character.js','ocean-scene.js','power-result.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation',name),'utf8'),world);
+  for(const name of ['model.js','population-display.js','swim-motion.js','shark-character.js','fish-character.js','marine-life.js','island-scene.js','ocean-scene.js','power-result.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation',name),'utf8'),world);
   const Scene=world.OceanScene;world.OceanScene=class extends Scene{constructor(...args){super(...args);scene=this;}};
   if(overrides.advanceOverride)world.GreyModel.advance=overrides.advanceOverride;
   if(overrides.startGeneration!==undefined){const initial=world.GreyModel.initial;world.GreyModel.initial=s=>({...initial(s),generation:overrides.startGeneration});}
@@ -223,4 +223,18 @@ test('a paused close-up shows allele-A genotype dosages even when the overview d
   assert(labels.some(x=>['0','1','2'].includes(x)));
   assert(labels.some(x=>['B/B','A/B','A/A'].includes(x)));
   a.tick(120);assert.deepEqual(a.state(),before);
+});
+
+test('animal selection preserves the live history, markers and pause state for every option',()=>{
+  const a=app({total:20,loci:10});assert.equal(a.element('shark-design').value,'hammer');
+  a.click('split');a.tick(20);a.click('play');a.click('meet-shark');
+  const worker=a.workers[0],seed=worker.initialRequest.seed;
+  for(const kind of ['turtle','surgeon','tuna','orca','seal','classic','hammer']){
+    const before=a.state();a.element('shark-design').value=kind;a.element('shark-design').onchange();
+    assert.equal(a.scene.variant,kind);assert.deepEqual(a.state(),before);assert.equal(a.workers.length,1);assert.equal(worker.initialRequest.seed,seed);
+    assert.equal(a.pendingClocks().frames,0);assert.equal(a.element('play').textContent,'Resume');
+    a.tick(20);assert.deepEqual(a.state(),before);
+    a.click('calculate-power');a.tick(6);assert(a.state().clock>before.clock);
+    a.click('play');const paused=a.state();a.tick(20);assert.deepEqual(a.state(),paused);
+  }
 });
