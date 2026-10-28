@@ -78,3 +78,11 @@ Open **Save & reproduce** below the settings. A whole-number seed in 0–4,294,9
 Save settings downloads a JSON file; Load settings validates and restores it without automatically starting. Copy link embeds the same configuration in the URL. Both include effective population/sampling settings, seed, display options and the sampling engine version. They restart from generation zero, not a saved checkpoint. Invalid files leave the active run untouched. Exact numerical replay requires this engine version; imports from unsupported engines are rejected.
 
 The default observation-station design is in `observatory.css`, applied over the preserved base stylesheet. **Previous design** in the footer switches to `?design=classic` and carries the current settings and seed, ready to restart at generation zero. **New design** switches back. The exact pre-redesign release is preserved in GitHub branch `backup/before-observatory-design`, commit `d9a4ea5d3499c3acf0db48771e2b65ea4566d8e2`. Model, sampling algorithms and animal renderers were not changed for this release.
+
+## Marine atlas design
+
+The default design now uses `atlas.css`: a bespoke marine chart header, a full-width live ocean with the controls above it, and a horizontal population/sampling dock underneath. Settings, Results and How to use are direct in-page navigation. Essential demographic-state text is enlarged to 16 px on desktop and 14 px on phones. The tutorial starts collapsed and its three screenshot views show the current dock, ocean and results. The model, power worker, sampler, accepted shark rendering and swimming code are unchanged.
+
+The footer's Previous design opens `?design=observatory`; Original layout opens `?design=classic`. The pre-atlas release is preserved in branch `backup/before-coastal-redesign`, commit `a67c6c9203b1c566e8afd30e6f3ad4febede49f5`. The earlier backup before release 24 also remains available. Switching the main design link carries the current experiment settings and seed and prepares generation zero.
+
+The decorative header is AI-generated marine atlas artwork, stored and served locally as `assets/atlas/marine-chart.webp`; it is unrelated to the numerical state or coastline in the live canvas. See its asset README for provenance. No additional generation-time or animation-time computations were added by the design.

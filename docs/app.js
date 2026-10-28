@@ -240,10 +240,10 @@ $('settings-file').onchange=async()=>{
 };
 $('design-switch').onclick=event=>{
   event.preventDefault();const url=new URL(GreyExperiment.link(experiment(),location.href));
-  if(url.searchParams.get('design')==='classic')url.searchParams.delete('design');else url.searchParams.set('design','classic');
+  if(['classic','observatory'].includes(url.searchParams.get('design')))url.searchParams.delete('design');else url.searchParams.set('design','observatory');
   location.href=url.href;
 };
-if(typeof location!=='undefined'&&new URL(location.href).searchParams.get('design')==='classic')setText('design-switch','New design ↗');
+if(typeof location!=='undefined'&&['classic','observatory'].includes(new URL(location.href).searchParams.get('design')))setText('design-switch','New design ↗');
 $('shark-design').onchange=()=>{ocean.variant=$('shark-design').value;animalLabels();drawScene();};$('travel-speed').onchange=()=>{ocean.travelPace=Number($('travel-speed').value);};$('segregating-only').onchange=renderSnps;$('show-markers').onchange=drawScene;ocean.onInspect=()=>{if(paused)drawScene();};$('meet-shark').onclick=()=>{ocean.selected=ocean.selected<0?1:-1;drawScene();};$('split').onclick=startRun;$('play').onclick=togglePlayback;$('step').onclick=singleStep;$('reset').onclick=reset;$('take-sample').onclick=takeSample;$('calculate-power').onclick=togglePower;for(const id of ['total','ratio','migration','sample-size','loci'])$(id).addEventListener('change',reset);$('ratio').addEventListener('input',()=>$('ratio-out').textContent=$('ratio').value+'%');$('sample-size').addEventListener('input',()=>$('sample-out').textContent=$('sample-size').value);document.addEventListener('visibilitychange',()=>{stopClocks();scheduleFrame();ensureBackgroundClock();});new ResizeObserver(resize).observe(canvas);
 let loadedExperiment=null,loadError=null;
 try{if(typeof location!=='undefined')loadedExperiment=GreyExperiment.fromUrl(location.href);}catch(error){loadError=error.message;}
