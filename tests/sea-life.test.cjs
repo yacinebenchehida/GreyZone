@@ -6,9 +6,9 @@ function drawing(){
   return {ctx,get depth(){return depth;},get calls(){return calls;}};
 }
 const draw=drawing(),world={Math,Number,Map,performance:{now:()=>0},devicePixelRatio:1,matchMedia:()=>({matches:false}),document:{createElement:()=>({getContext:()=>draw.ctx})},Path2D:class{constructor(){return draw.ctx;}}};vm.createContext(world);
-for(const name of ['model.js','population-display.js','swim-motion.js','shark-character.js','fish-character.js','marine-life.js','animal-cache.js','island-scene.js','ocean-scene.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation',name),'utf8'),world);
+for(const name of ['model.js','population-display.js','swim-motion.js','shark-character.js','fish-character.js','cetacean-character.js','marine-life.js','animal-cache.js','island-scene.js','ocean-scene.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation',name),'utf8'),world);
 
-test('all seven selectable animals render finite, balanced drawings with the same diploid marker input',()=>{
+test('all selectable animals render finite, balanced drawings with the same diploid marker input',()=>{
   const snps=[[false,false],[true,false],[true,true]],palettes=world.GreyDisplay.markerPalettes([[.5,.5,.5],[.4,.4,.4]],[0,1,2]);
   for(const kind of Object.keys(world.SeaLife.catalogue))for(const stroke of [0,1.3,4.8]){
     const before=draw.calls,animal={x:200,y:120,heading:.7,scale:.8,stroke,effort:.9,bend:.3,phase:.8};

@@ -3,7 +3,7 @@
 (function(root){
 'use strict';
 const TAU=Math.PI*2,phases=24,bends=7;
-const rates={hammer:1,classic:1,tuna:1,surgeon:1,turtle:.22,orca:.43,seal:.57};
+const rates={hammer:1,classic:1,tuna:1,surgeon:1,turtle:.22,orca:.43,seal:.57,whale:.29,porpoise:.48};
 class AnimalPoseCache{
   constructor(){this.kind=null;this.images=new Map();}
   pose(animal,kind){
@@ -25,6 +25,7 @@ class AnimalPoseCache{
     }
     c.save();c.translate(animal.x,animal.y);c.rotate(animal.heading||0);c.scale(animal.scale||1,animal.scale||1);
     c.drawImage(image,-128,-80,256,160);
+    if(kind==='whale'||kind==='porpoise'){c.restore();CetaceanCharacter.surface(c,animal,time,kind);c.save();c.translate(animal.x,animal.y);c.rotate(animal.heading||0);c.scale(animal.scale||1,animal.scale||1);}
     if(options.snps)SeaLife.drawMarkers(c,pose,options);
     c.restore();return true;
   }

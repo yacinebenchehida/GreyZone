@@ -10,12 +10,15 @@ const catalogue={
   surgeon:{name:'Blue tang',singular:'blue tang',plural:'blue tangs',portrait:1},
   tuna:{name:'Tuna',singular:'tuna',plural:'tuna',portrait:1},
   orca:{name:'Orca',singular:'orca',plural:'orcas',portrait:.9},
+  whale:{name:'Humpback whale',singular:'humpback whale',plural:'humpback whales',portrait:.80},
+  porpoise:{name:'Harbour porpoise',singular:'harbour porpoise',plural:'harbour porpoises',portrait:1},
   seal:{name:'Harbour seal',singular:'seal',plural:'seals',portrait:1}
 };
 function info(kind){return catalogue[kind]||catalogue.hammer;}
 function oval(c,x,y,rx,ry,color,angle=0){c.fillStyle=color;c.beginPath();c.ellipse(x,y,rx,ry,angle,0,TAU);c.fill();}
 function contour(c,points){c.beginPath();const a=points[0],b=points.at(-1);c.moveTo((a.x+b.x)/2,(a.y+b.y)/2);for(let i=0;i<points.length;i++){const p=points[i],q=points[(i+1)%points.length];c.quadraticCurveTo(p.x,p.y,(p.x+q.x)/2,(p.y+q.y)/2);}c.closePath();}
 function field(a,kind){
+  if(kind==='whale'||kind==='porpoise')return CetaceanCharacter.field(a,kind);
   const phase=(a.stroke||0)*(kind==='orca'?.43:kind==='seal'?.57:1),turn=a.bend||0;
   function spine(u){const wave=kind==='orca'?Math.sin(phase-u*2)*1.25:Math.sin(u*6.3-phase)*(kind==='seal'?4:5);return{x:kind==='seal'?56-112*u:70-140*u,y:u*u*(wave+turn*(kind==='seal'?23:28))};}
   function basis(u){const p=spine(u),q=spine(u+.002);return {...p,a:Math.atan2(p.y-q.y,p.x-q.x)};}
@@ -93,6 +96,7 @@ function draw(c,a,time=0,options={}){
   if(kind==='hammer'||kind==='classic'){SharkCharacter.draw(c,a,time,options);return;}
   if(kind==='surgeon'){FishCharacter.draw(c,{...a,scale:(a.scale||1)*1.25},time,{species:'surgeon',snps:options.snps,snpPalettes:options.snpPalettes});return;}
   if(!options.skipWake)wake(c,a,time,kind);
+  if(kind==='whale'||kind==='porpoise'){CetaceanCharacter.draw(c,a,time,options);if(!options.skipWake)CetaceanCharacter.surface(c,a,time,kind);return;}
   if(kind==='turtle')drawTurtle(c,a,time,options);else if(kind==='tuna')drawTuna(c,a,time,options);else if(kind==='orca')drawOrca(c,a,time,options);else if(kind==='seal')drawSeal(c,a,time,options);
 }
 // Marker-only overlay for cached bodies. Coordinates match each original renderer.

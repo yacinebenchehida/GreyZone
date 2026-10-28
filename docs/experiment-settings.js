@@ -18,7 +18,7 @@
     if(!s||!totals.includes(s.total)||!Number.isInteger(s.ratio)||s.ratio<10||s.ratio>90||s.ratio%10||!migrations.includes(s.m)||!loci.includes(s.loci))throw new Error('The population settings are not supported.');
     const west=Math.round(s.total*s.ratio/100),cap=Math.min(150,west,s.total-west);
     if(!Number.isInteger(s.sample)||s.sample<1||s.sample>cap)throw new Error('The sample size exceeds the population or supported range.');
-    if(!v||!['hammer','classic','turtle','surgeon','tuna','orca','seal'].includes(v.animal)||![.6,.95,1.6].includes(v.travelSpeed)||![1.5,6,25].includes(v.generationSpeed)||typeof v.showMarkers!=='boolean')throw new Error('The display settings are not supported.');
+    if(!v||!['hammer','classic','turtle','surgeon','tuna','orca','seal','whale','porpoise'].includes(v.animal)||![.6,.95,1.6].includes(v.travelSpeed)||![1.5,6,25].includes(v.generationSpeed)||typeof v.showMarkers!=='boolean')throw new Error('The display settings are not supported.');
     return {format:'greyzone-experiment',version:1,engine,seed:seed(data.seed),settings:{total:s.total,ratio:s.ratio,m:s.m,sample:s.sample,loci:s.loci},view:{animal:v.animal,travelSpeed:v.travelSpeed,generationSpeed:v.generationSpeed,showMarkers:v.showMarkers}};
   }
   function create(settings,runSeed,view){return validate({format:'greyzone-experiment',version:1,engine,seed:runSeed,settings,view});}

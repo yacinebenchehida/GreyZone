@@ -3,7 +3,7 @@ function fixture(width=940,dpr=2){
   let now=1000,paths=0,images=0,bodyDraws=0;const gradient={addColorStop(){}};
   const drawing=new Proxy({createLinearGradient:()=>gradient,createRadialGradient:()=>gradient,drawImage(){images++;}}, {get:(o,k)=>k in o?o[k]:(...args)=>{for(const x of args)if(typeof x==='number')assert(Number.isFinite(x));paths++;}});
   const world={Math,Number,Map,performance:{now:()=>now},devicePixelRatio:dpr,matchMedia:()=>({matches:false}),document:{createElement:()=>({getContext:()=>drawing})},Path2D:class{constructor(){return drawing;}}};vm.createContext(world);
-  for(const name of ['model.js','population-display.js','swim-motion.js','shark-character.js','fish-character.js','marine-life.js','animal-cache.js','island-scene.js','ocean-scene.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation',name),'utf8'),world);
+  for(const name of ['model.js','population-display.js','swim-motion.js','shark-character.js','fish-character.js','cetacean-character.js','marine-life.js','animal-cache.js','island-scene.js','ocean-scene.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation',name),'utf8'),world);
   const original=world.SeaLife.draw;world.SeaLife.draw=(...args)=>{bodyDraws++;return original(...args);};
   const canvas={getContext:()=>drawing,getBoundingClientRect:()=>({width,height:540}),addEventListener(){},style:{}};
   const scene=new world.OceanScene(canvas);scene.reset({total:20,ratio:50,loci:10,m:0});

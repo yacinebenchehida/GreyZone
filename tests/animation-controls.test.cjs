@@ -36,7 +36,7 @@ function app(overrides={}){
   if(overrides.intersection)world.IntersectionObserver=class{constructor(fn){intersection=fn;}observe(){}};
   if(overrides.url)world.location={href:overrides.url};
   vm.createContext(world);
-  for(const name of ['experiment-settings.js','model.js','population-display.js','swim-motion.js','shark-character.js','fish-character.js','marine-life.js','animal-cache.js','island-scene.js','ocean-scene.js','power-result.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation',name),'utf8'),world);
+  for(const name of ['experiment-settings.js','model.js','population-display.js','swim-motion.js','shark-character.js','fish-character.js','cetacean-character.js','marine-life.js','animal-cache.js','island-scene.js','ocean-scene.js','power-result.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation',name),'utf8'),world);
   const Scene=world.OceanScene;world.OceanScene=class extends Scene{constructor(...args){super(...args);scene=this;}};
   if(overrides.advanceOverride)world.GreyModel.advance=overrides.advanceOverride;
   if(overrides.startGeneration!==undefined){const initial=world.GreyModel.initial;world.GreyModel.initial=s=>({...initial(s),generation:overrides.startGeneration});}
@@ -275,7 +275,7 @@ test('animal selection preserves the live history, markers and pause state for e
   const a=app({total:20,loci:10});assert.equal(a.element('shark-design').value,'hammer');
   a.click('split');a.tick(20);a.click('play');a.click('meet-shark');
   const worker=a.workers[0],seed=worker.initialRequest.seed;
-  for(const kind of ['turtle','surgeon','tuna','orca','seal','classic','hammer']){
+  for(const kind of ['turtle','surgeon','tuna','orca','seal','whale','porpoise','classic','hammer']){
     const before=a.state();a.element('shark-design').value=kind;a.element('shark-design').onchange();
     assert.equal(a.scene.variant,kind);assert.deepEqual(a.state(),before);assert.equal(a.workers.length,1);assert.equal(worker.initialRequest.seed,seed);
     assert.equal(a.pendingClocks().frames,0);assert.equal(a.element('play').textContent,'Resume');
