@@ -70,3 +70,11 @@ A browser worker comparison used 1000 studies and identical population frequenci
 | 100 | 5000 | 3847 ms | 561 ms |
 
 These measurements include worker scheduling and the sampling interval, exclude ocean rendering, and apply to the test browser rather than a measured phone. Repeated runs varied; the earlier 40-individual run measured 439 → 36 ms and 2304 → 298 ms respectively. No fixed device-independent speedup is assumed.
+
+## Reproducible experiments and design
+
+Open **Save & reproduce** below the settings. A whole-number seed in 0–4,294,967,295 controls the independent evolutionary, power-resampling and manual-sampling RNG streams. Entering a seed selects **Reuse this seed**; repeated runs then reproduce the population and power curves at each generation. Otherwise, Run again chooses a fresh seed. New seed prepares a different history at generation zero. Playback, pauses, animal choices and manual samples cannot change the evolutionary or power RNG streams. Animal poses depend on frame timing, so their exact motion is not a replay guarantee.
+
+Save settings downloads a JSON file; Load settings validates and restores it without automatically starting. Copy link embeds the same configuration in the URL. Both include effective population/sampling settings, seed, display options and the sampling engine version. They restart from generation zero, not a saved checkpoint. Invalid files leave the active run untouched. Exact numerical replay requires this engine version; imports from unsupported engines are rejected.
+
+The default observation-station design is in `observatory.css`, applied over the preserved base stylesheet. **Previous design** in the footer switches to `?design=classic` and carries the current settings and seed, ready to restart at generation zero. **New design** switches back. The exact pre-redesign release is preserved in GitHub branch `backup/before-observatory-design`, commit `d9a4ea5d3499c3acf0db48771e2b65ea4566d8e2`. Model, sampling algorithms and animal renderers were not changed for this release.

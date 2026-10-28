@@ -23,7 +23,7 @@ function app(overrides={}){
   }
   let time=1000,scene,timerId=0,frameId=0,framesRun=0,seed=100;const timers=new Map(),frames=new Map(),workers=[];let intersection;
   const document={hidden:false,getElementById:element,createTextNode:textNode,createElement:()=>({getContext:()=>drawing}),addEventListener:(event,fn)=>{listeners[event]=fn;}};
-  const world={Math,Number,document,crypto:{getRandomValues(value){value[0]=++seed;return value;}},setTimeout:fn=>{timers.set(++timerId,fn);return timerId;},clearTimeout:id=>timers.delete(id),Worker:class{
+  const world={Math,Number,document,URL,atob,btoa,crypto:{getRandomValues(value){value[0]=++seed;return value;}},setTimeout:fn=>{timers.set(++timerId,fn);return timerId;},clearTimeout:id=>timers.delete(id),Worker:class{
       constructor(){workers.push(this);this.points=[];}
       postMessage(data){
         this.request=data;if(data.type==='init'){this.initialRequest=data;this.points=[{t:data.population?.generation??0,power:.05,hits:50}];}
@@ -34,8 +34,9 @@ function app(overrides={}){
     },devicePixelRatio:1,matchMedia:()=>({matches:false}),performance:{now:()=>time},
     Path2D:class{constructor(){return drawing;}},ResizeObserver:class{observe(){}},requestAnimationFrame:fn=>{frames.set(++frameId,fn);return frameId;},cancelAnimationFrame:id=>frames.delete(id)};
   if(overrides.intersection)world.IntersectionObserver=class{constructor(fn){intersection=fn;}observe(){}};
+  if(overrides.url)world.location={href:overrides.url};
   vm.createContext(world);
-  for(const name of ['model.js','population-display.js','swim-motion.js','shark-character.js','fish-character.js','marine-life.js','animal-cache.js','island-scene.js','ocean-scene.js','power-result.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation',name),'utf8'),world);
+  for(const name of ['experiment-settings.js','model.js','population-display.js','swim-motion.js','shark-character.js','fish-character.js','marine-life.js','animal-cache.js','island-scene.js','ocean-scene.js','power-result.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation',name),'utf8'),world);
   const Scene=world.OceanScene;world.OceanScene=class extends Scene{constructor(...args){super(...args);scene=this;}};
   if(overrides.advanceOverride)world.GreyModel.advance=overrides.advanceOverride;
   if(overrides.startGeneration!==undefined){const initial=world.GreyModel.initial;world.GreyModel.initial=s=>({...initial(s),generation:overrides.startGeneration});}
@@ -374,4 +375,37 @@ test('both Pause controls freeze cached bodies, SNP overlays and generations aft
     a.tick(120);assert.deepEqual(a.state(),paused);assert.equal(a.scene.poseCache.images.size,images);assert.equal(a.pendingClocks().frames,0);
     a.click(id);a.tick();assert(a.scene.clock>paused.clock&&a.scene.clock-paused.clock<.02);assert.equal(a.workers[0],worker);
   }
+});
+
+test('explicit seed repeats the same history while playback, pause and manual samples cannot change it',()=>{
+  const a=app(),b=app();
+  for(const instance of [a,b]){instance.element('random-seed').value='47129';instance.element('random-seed').onchange();instance.click('split');instance.scene.draw=()=>{};}
+  a.tick(60);a.click('play');const g=Number(a.state().generation);
+  for(let i=0;i<g;i++){b.click('step');b.click('take-sample');}
+  assert.equal(JSON.stringify(a.workers[0].lastAdvance.population),JSON.stringify(b.workers[0].lastAdvance.population));
+  assert.equal(a.workers[0].initialRequest.seed,b.workers[0].initialRequest.seed);
+  const before=JSON.stringify(a.workers[0].lastAdvance.population);a.click('split');a.click('play');
+  for(let i=0;i<g;i++)a.click('step');
+  assert.equal(JSON.stringify(a.workers[1].lastAdvance.population),before);
+  a.click('new-seed');const selected=a.element('random-seed').value;a.click('split');
+  assert.equal(a.element('random-seed').value,selected);assert.notEqual(selected,'47129');
+});
+
+test('a shared experiment restores controls, clamps correctly from a previously tiny population and locks its seed',()=>{
+  const E=require('../animation/experiment-settings.js');
+  const data=E.create({total:50000,ratio:30,m:.005,sample:120,loci:1000},0,{animal:'orca',travelSpeed:.6,generationSpeed:1.5,showMarkers:true});
+  const a=app({total:10,url:E.link(data,'https://example.com/')});
+  assert.equal(Number(a.element('total').value),50000);assert.equal(Number(a.element('sample-size').value),120);
+  assert.equal(a.element('sample-size').max,150);assert.equal(a.element('random-seed').value,'0');
+  assert.equal(a.element('seed-lock').checked,true);assert.equal(a.element('shark-design').value,'orca');
+  assert.equal(a.element('show-markers').checked,true);assert.equal(a.state().generation,'0');
+  assert.equal(a.workers.length,0);a.click('split');assert.equal(a.workers[0].initialRequest.settings.sample,120);
+  assert.equal(a.workers[0].initialRequest.settings.loci,1000);assert.equal(a.element('random-seed').value,'0');
+});
+
+test('invalid imports preserve the active run and seed validation cannot corrupt it',()=>{
+  const a=app({total:20,url:'https://example.com/?experiment=bad!'});assert.match(a.element('settings-message').textContent,/invalid/);
+  a.click('split');a.tick(20);a.click('play');const before=a.state(),seed=a.element('random-seed').value;
+  a.element('random-seed').value='1e3';a.element('random-seed').onchange();assert.deepEqual(a.state(),before);
+  assert.equal(a.element('random-seed').value,seed);assert.match(a.element('settings-message').textContent,/whole-number/);
 });

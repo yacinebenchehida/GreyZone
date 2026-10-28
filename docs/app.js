@@ -28,8 +28,8 @@ function animalLabels(){
 }
 function prepareActors(){ocean.reset(s);ocean.travelPace=Number($('travel-speed').value);ocean.variant=$('shark-design').value;animalLabels();}
 
-function reset(){
-  stopClocks();stopWorker();valueLines.clear();s=settings();runSeed=freshSeed();s.displaySeed=runSeed^0x6179a3bd;
+function reset(seed){
+  stopClocks();stopWorker();valueLines.clear();s=settings();runSeed=Number.isInteger(seed)?seed:$('seed-lock').checked?GreyExperiment.seed($('random-seed').value):freshSeed();$('random-seed').value=String(runSeed);s.displaySeed=runSeed^0x6179a3bd;
   const [n1,n2]=M.sizes(s),cap=Math.min(150,n1,n2);
   $('sample-size').min=1;$('sample-size').step=1;$('sample-size').max=cap;
   if(s.sample>cap){$('sample-size').value=cap;s.sample=cap;}
@@ -50,8 +50,8 @@ function reset(){
   $('sample-generation').textContent='NOT SAMPLED';$('sample-result').className='sample-result';
   $('sample-result').innerHTML='<span class="sample-icon">?</span><strong>What would your study find?</strong><p>The barrier can be real even when the genetic test misses it.</p>';$('sample-history').textContent='';sync();scheduleFrame();
 }
-function startRun(){reset();hasRun=true;split=true;running=true;paused=false;$('split').textContent='Run again';$('take-sample').disabled=false;sync();calculatePower();}
-function sync(){const g=pop.generation;setText('generation',number(g));$('play').disabled=!split||finished;$('step').disabled=!split||finished||stepPowerTarget!==null;setText('play',finished?'Fixed':running?'Pause':'Resume');$('play').setAttribute('aria-pressed',String(paused));$('calculate-power').setAttribute('aria-pressed',String(paused));setText('phase',split?(s.m?'Two populations connected by migration.':'Demographically independent populations.'):'One connected population.');$('barrier-label').hidden=!split;$('channel-label').hidden=!split||!s.m;setText('fst-value','FST '+M.fst(pop.a,pop.b).toFixed(4));if(!split)setText('story','Choose Ne, m and your study design, then press Run simulation.');else if(!g)setText('story','The split has started. Both populations begin with identical allele frequencies.');else setText('story',s.m?`Generation ${g}: drift pulls the populations apart; migrants reconnect their gene pools.`:`Generation ${g}: no individuals cross. A genetic study may still miss the separation.`);if(finished)setText('story',`All ${s.loci} SNPs are fixed at generation ${number(g)}. Run again for a new history.`);renderSnps();plotFst();plotPower();}
+function startRun(){const seed=hasRun&&!$('seed-lock').checked?freshSeed():runSeed;reset(seed);hasRun=true;split=true;running=true;paused=false;$('split').textContent='Run again';$('take-sample').disabled=false;sync();calculatePower();}
+function sync(){const g=pop.generation;setText('generation',number(g));$('play').disabled=!split||finished;$('step').disabled=!split||finished||stepPowerTarget!==null;setText('play',finished?'Fixed':running?'Pause':'Resume');$('play').setAttribute('aria-pressed',String(paused));$('calculate-power').setAttribute('aria-pressed',String(paused));setText('phase',split?(s.m?'Two populations connected by migration.':'Demographically independent populations.'):'One connected population.');$('barrier-label').hidden=!split;$('channel-label').hidden=!split||!s.m;setText('fst-value','FST '+M.fst(pop.a,pop.b).toFixed(4));if(!split)setText('story','Choose Ne, m and your study design, then press Run simulation.');else if(!g)setText('story','The split has started. Both populations begin with identical allele frequencies.');else setText('story',s.m?`Generation ${g}: drift pulls the populations apart; migrants reconnect their gene pools.`:`Generation ${g}: no individuals cross. A genetic study may still miss the separation.`);if(finished)setText('story',`All ${s.loci} SNPs are fixed at generation ${number(g)}. Change the seed to explore another history.`);renderSnps();plotFst();plotPower();}
 function renderSnps(){
   const aggregate=s.loci>100; // Above 100 markers, render only aggregate counts.
   const onlyVariable=!aggregate&&$('segregating-only').checked; // The individual-marker filter never filters the summary.
@@ -205,7 +205,51 @@ function frame(now){animationFrame=null;if(document.hidden||paused)return;advanc
 function backgroundTick(){backgroundTimer=null;if(document.hidden&&running){advanceClock(performance.now());ensureBackgroundClock();}}
 function ensureBackgroundClock(){if(document.hidden&&running&&backgroundTimer===null)backgroundTimer=setTimeout(backgroundTick,100);}
 
-$('shark-design').onchange=()=>{ocean.variant=$('shark-design').value;animalLabels();drawScene();};$('travel-speed').onchange=()=>{ocean.travelPace=Number($('travel-speed').value);};$('segregating-only').onchange=renderSnps;$('show-markers').onchange=drawScene;ocean.onInspect=()=>{if(paused)drawScene();};$('meet-shark').onclick=()=>{ocean.selected=ocean.selected<0?1:-1;drawScene();};$('split').onclick=startRun;$('play').onclick=togglePlayback;$('step').onclick=singleStep;$('reset').onclick=reset;$('take-sample').onclick=takeSample;$('calculate-power').onclick=togglePower;for(const id of ['total','ratio','migration','sample-size','loci'])$(id).addEventListener('change',reset);$('ratio').addEventListener('input',()=>$('ratio-out').textContent=$('ratio').value+'%');$('sample-size').addEventListener('input',()=>$('sample-out').textContent=$('sample-size').value);document.addEventListener('visibilitychange',()=>{stopClocks();scheduleFrame();ensureBackgroundClock();});new ResizeObserver(resize).observe(canvas);reset();resize();
+// Export the seed and effective settings, never a partially completed worker batch.
+function experiment(){return GreyExperiment.create(s,runSeed,{animal:$('shark-design').value,travelSpeed:Number($('travel-speed').value),generationSpeed:Number($('speed').value),showMarkers:$('show-markers').checked});}
+function settingsMessage(message){setText('settings-message',message);$('experiment-link').hidden=true;}
+function applyExperiment(data){
+  const config=GreyExperiment.validate(data),v=config.view;
+  $('sample-size').max=150; // Restore the supported range before assigning a larger imported sample.
+  for(const [id,key]of [['total','total'],['ratio','ratio'],['sample-size','sample'],['loci','loci']])$(id).value=String(config.settings[key]);
+  $('migration').value=config.settings.m.toFixed(6);
+  $('shark-design').value=v.animal;$('travel-speed').value=String(v.travelSpeed);$('speed').value=String(v.generationSpeed);$('show-markers').checked=v.showMarkers;
+  $('seed-lock').checked=true;reset(config.seed); // Loading stops the old run and prepares generation zero.
+}
+function saveSettings(){
+  const data=experiment(),blob=new Blob([JSON.stringify(data,null,2)+'\n'],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download='greyzone-seed-'+data.seed+'.json';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  settingsMessage('Settings saved · seed '+data.seed+'. Restarts at generation 0.');
+}
+async function copyExperiment(){
+  const url=GreyExperiment.link(experiment(),location.href);
+  try{await navigator.clipboard.writeText(url);settingsMessage('Link copied. Opens the same history at generation 0.');}
+  catch(error){settingsMessage('Copy this experiment link:');$('experiment-link').href=url;$('experiment-link').textContent=url;$('experiment-link').hidden=false;}
+}
+$('random-seed').onchange=()=>{
+  try{const seed=GreyExperiment.seed($('random-seed').value);$('seed-lock').checked=true;reset(seed);settingsMessage('Seed selected. Run simulation to begin.');}
+  catch(error){$('random-seed').value=String(runSeed);settingsMessage(error.message);}
+};
+$('new-seed').onclick=()=>{reset(freshSeed());settingsMessage('New seed selected. Run simulation to begin.');};
+$('save-settings').onclick=saveSettings;$('load-settings').onclick=()=>$('settings-file').click();$('copy-experiment').onclick=copyExperiment;
+$('settings-file').onchange=async()=>{
+  const file=$('settings-file').files[0];if(!file)return;
+  try{if(file.size>10000)throw new Error('The settings file is too large.');const data=GreyExperiment.parse(await file.text());applyExperiment(data);settingsMessage('Settings loaded · seed '+data.seed+'. Run simulation to begin.');}
+  catch(error){settingsMessage(error.message);}
+  finally{$('settings-file').value='';}
+};
+$('design-switch').onclick=event=>{
+  event.preventDefault();const url=new URL(GreyExperiment.link(experiment(),location.href));
+  if(url.searchParams.get('design')==='classic')url.searchParams.delete('design');else url.searchParams.set('design','classic');
+  location.href=url.href;
+};
+if(typeof location!=='undefined'&&new URL(location.href).searchParams.get('design')==='classic')setText('design-switch','New design ↗');
+$('shark-design').onchange=()=>{ocean.variant=$('shark-design').value;animalLabels();drawScene();};$('travel-speed').onchange=()=>{ocean.travelPace=Number($('travel-speed').value);};$('segregating-only').onchange=renderSnps;$('show-markers').onchange=drawScene;ocean.onInspect=()=>{if(paused)drawScene();};$('meet-shark').onclick=()=>{ocean.selected=ocean.selected<0?1:-1;drawScene();};$('split').onclick=startRun;$('play').onclick=togglePlayback;$('step').onclick=singleStep;$('reset').onclick=reset;$('take-sample').onclick=takeSample;$('calculate-power').onclick=togglePower;for(const id of ['total','ratio','migration','sample-size','loci'])$(id).addEventListener('change',reset);$('ratio').addEventListener('input',()=>$('ratio-out').textContent=$('ratio').value+'%');$('sample-size').addEventListener('input',()=>$('sample-out').textContent=$('sample-size').value);document.addEventListener('visibilitychange',()=>{stopClocks();scheduleFrame();ensureBackgroundClock();});new ResizeObserver(resize).observe(canvas);
+let loadedExperiment=null,loadError=null;
+try{if(typeof location!=='undefined')loadedExperiment=GreyExperiment.fromUrl(location.href);}catch(error){loadError=error.message;}
+if(loadedExperiment){applyExperiment(loadedExperiment);settingsMessage('Shared experiment loaded · seed '+loadedExperiment.seed+'. Run simulation to begin.');$('experiment-file').open=true;}
+else{reset();if(loadError){settingsMessage(loadError);$('experiment-file').open=true;}}
+resize();
 if(typeof IntersectionObserver==='function')new IntersectionObserver(entries=>{
   const visible=entries.some(entry=>entry.isIntersecting);
   if(visible===oceanVisible)return;oceanVisible=visible;
