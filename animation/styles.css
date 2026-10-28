@@ -62,3 +62,6 @@ header,main,footer{max-width:1520px}.intro{padding:32px 0 28px}h1{font-size:62px
 @media(max-width:720px){.guide-pin{width:23px;height:23px;font-size:10px}.guide-screen{margin-top:19px}.guide-callouts{gap:14px}.guide-experiments li{padding:17px}}
 
 .guide-walkthrough{margin:23px 0 27px}.guide-walkthrough .guide-screen{margin:0}.guide-walkthrough .guide-callouts{margin-bottom:0}@media(min-width:1000px){.guide-walkthrough{display:grid;grid-template-columns:minmax(0,2.2fr) minmax(240px,1fr);gap:23px;align-items:start}.guide-walkthrough .guide-callouts{margin:0;font-size:13px;line-height:1.65}}
+
+/* Keep the demographic state readable beside the generation counter. */
+.world-head{gap:12px}.world-head>div{min-width:0;flex:1}.world-head .generation{flex-shrink:0;white-space:nowrap}.detection-test{font-size:11px;color:#426864;margin:9px 0 5px}.guide-test-title{font-size:15px;color:#274f52;margin:25px 0 8px}
