@@ -36,3 +36,13 @@ header,main,footer{max-width:1520px}.intro{padding:32px 0 28px}h1{font-size:62px
 .snp-grid:focus-visible{outline:2px solid #73998f;outline-offset:3px}
 
 .sim-intro{padding:27px 0 25px}.sim-intro h1{font:normal clamp(26px,3vw,37px)/1.15 Georgia,serif;letter-spacing:-.7px;margin:0 0 9px}.sim-intro p{font-size:14px;color:#607a79;max-width:800px;margin:0}.sea-caption{justify-content:flex-end}header{height:76px}@media(max-width:720px){.sim-intro{padding:22px 0}.sim-intro p{font-size:12px}}
+
+/* Live numbers retain their text nodes and use equal-width digits. */
+#power-progress,#power-now,#generation,#fst-value{font-variant-numeric:tabular-nums}
+#power-progress{min-height:2.6em}#power-now{min-height:3.1em}
+
+/* Population frequencies, separate from the animal genotype key. */
+.frequency-key{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;margin-top:16px;color:#637771;font-size:11px}.frequency-key span{display:inline-flex;align-items:center;gap:6px}.frequency-swatch{display:inline-block;width:19px;height:8px;border-radius:3px}.frequency-swatch.allele-a{background:#f4c98b}.frequency-swatch.allele-b{background:#fae9ce}.frequency-key-note{font-size:10px;color:#73817b}
+.snp-frequency-row{grid-template-columns:29px minmax(32px,1fr) 146px}.snp-frequency-row b{font-size:9px}.snp-frequency-bar{background:#fae9ce}.snp-frequency-bar.fixed{background:transparent}
+@media(max-width:720px){.snp-frequency-row{grid-template-columns:29px minmax(36px,1fr) 137px}.snp-frequency-row b{font-size:9px}}
+.snp-frequency-row{grid-template-columns:29px minmax(0,1fr);gap:2px 5px;margin-top:5px}.snp-frequency-row b{grid-column:2;grid-row:1;font-size:10px}.snp-frequency-bar{grid-column:1/-1;grid-row:2}

@@ -4,6 +4,16 @@ const M=GreyModel,$=id=>document.getElementById(id),canvas=$('scene'),ocean=new 
 let s,pop,evolve,observe,split=false,running=false,paused=false,history=[],power=null,pendingPower=null,progress=null,pendingProgress=null,completedThrough=-1,stepPowerTarget=null,worker=null,job=0,sampleResults=[],lastSampleGen=-1,last=0,accumulator=0,hasRun=false,runSeed=0,seedCounter=0,finished=false,backgroundTimer=null,animationFrame=null,snpDisplayPop=null,snpDisplayFilter=null;
 function settings(){return {total:+$('total').value,ratio:+$('ratio').value,m:+$('migration').value,sample:+$('sample-size').value,loci:+$('loci').value,studies:1000};}
 function number(x){return x.toLocaleString('en-GB');}
+// Retain text nodes: unchanged labels must not be removed and repainted.
+function setText(id,value){const el=$(id),text=String(value);if(el.textContent!==text){if(el.childNodes.length===1&&el.firstChild.nodeType===3)el.firstChild.data=text;else el.textContent=text;}}
+const valueLines=new Map();
+function valueLine(id,parts){
+  const el=$(id),old=valueLines.get(id);
+  if(!old||old.parts.length!==parts.length||parts.some((part,i)=>i%2===0&&old.parts[i]!==part)){
+    const nodes=parts.map(part=>document.createTextNode(String(part)));el.replaceChildren(...nodes);valueLines.set(id,{parts:parts.slice(),nodes});return;
+  }
+  parts.forEach((part,i)=>{if(i%2&&old.nodes[i].data!==String(part))old.nodes[i].data=String(part);});
+}
 function isFixed(){const state=GreyDisplay.sorting([pop.a,pop.b]);return state.fixed===s.loci&&(s.m===0||state.opposite===0);}
 function freshSeed(){
   const value=new Uint32Array(1);if(globalThis.crypto?.getRandomValues)globalThis.crypto.getRandomValues(value);else value[0]=Math.floor(Math.random()*4294967296);
@@ -19,7 +29,7 @@ function animalLabels(){
 function prepareActors(){ocean.reset(s);ocean.travelPace=Number($('travel-speed').value);ocean.variant=$('shark-design').value;animalLabels();}
 
 function reset(){
-  stopClocks();stopWorker();s=settings();runSeed=freshSeed();s.displaySeed=runSeed^0x6179a3bd;
+  stopClocks();stopWorker();valueLines.clear();s=settings();runSeed=freshSeed();s.displaySeed=runSeed^0x6179a3bd;
   const [n1,n2]=M.sizes(s),cap=Math.min(150,n1,n2);
   $('sample-size').min=1;$('sample-size').step=1;$('sample-size').max=cap;
   if(s.sample>cap){$('sample-size').value=cap;s.sample=cap;}
@@ -32,16 +42,16 @@ function reset(){
   $('sample-description').textContent=`${s.sample} individuals per side · ${s.loci} independent ${s.loci===1?'SNP':'SNPs'}`;
   $('split').disabled=false;$('split').innerHTML='Run simulation <span>↗</span>';
   $('take-sample').disabled=true;$('take-sample').innerHTML='Take a genetic sample <span>→</span>';
-  $('calculate-power').disabled=false;$('calculate-power').textContent='Run simulation';$('power-progress').textContent='READY';
-  $('power-time').textContent='—';$('power-scene-time').textContent='Choose settings, then Run simulation';
-  $('power-meaning').textContent='Choose Ne, m, sample size and SNP count. Watch the live run. Detection power is estimated at the same generations.';
-  $('power-note').textContent=`${number(s.studies)} study samples of this live population pair follow the live clock. Evolution continues after detection.`;
+  $('calculate-power').disabled=false;setText('calculate-power','Run simulation');$('power-progress').textContent='READY';
+  setText('power-time','—');setText('power-scene-time','Choose settings, then Run simulation');
+  setText('power-meaning','Choose Ne, m, sample size and SNP count. Watch the live run. Detection power is estimated at the same generations.');
+  setText('power-note',`${number(s.studies)} study samples of this live population pair follow the live clock. Evolution continues after detection.`);
   $('power-design').textContent=`West Ne ${number(n1)} · east Ne ${number(n2)} · m ${s.m} · ${s.sample} sampled per side · ${s.loci} ${s.loci===1?'SNP':'SNPs'} · ${number(s.studies)} study samples`;
   $('sample-generation').textContent='NOT SAMPLED';$('sample-result').className='sample-result';
   $('sample-result').innerHTML='<span class="sample-icon">?</span><strong>What would your study find?</strong><p>The barrier can be real even when the genetic test misses it.</p>';$('sample-history').textContent='';sync();scheduleFrame();
 }
 function startRun(){reset();hasRun=true;split=true;running=true;paused=false;$('split').textContent='Run again';$('take-sample').disabled=false;sync();calculatePower();}
-function sync(){const g=pop.generation;$('generation').textContent=number(g);$('play').disabled=!split||finished;$('step').disabled=!split||finished||completedThrough<g;$('play').textContent=finished?'Fixed':running?'Pause':'Resume';$('play').setAttribute('aria-pressed',String(paused));$('calculate-power').setAttribute('aria-pressed',String(paused));$('phase').textContent=split?(s.m?'Two seas. A connecting channel.':'Two seas. Complete isolation.'):'One sea. One population.';$('barrier-label').hidden=!split;$('channel-label').hidden=!split||!s.m;$('fst-value').textContent='FST '+M.fst(pop.a,pop.b).toFixed(4);if(!split)$('story').textContent='Choose Ne, m and your study design, then press Run simulation.';else if(!g)$('story').textContent='The split has started. Both populations begin with identical allele frequencies.';else $('story').textContent=s.m?`Generation ${g}: drift pulls the populations apart; migrants reconnect their gene pools.`:`Generation ${g}: no individuals cross. A genetic study may still miss the separation.`;if(finished)$('story').textContent=`All ${s.loci} SNPs are fixed at generation ${number(g)}. Run again for a new history.`;const sorted=GreyDisplay.sorting([pop.a,pop.b]);$('sorting-status').textContent=`${sorted.total-sorted.fixed}/${sorted.total} segregating · ${sorted.fixed-sorted.opposite}/${sorted.total} fixed identically · ${sorted.opposite}/${sorted.total} fixed differently.`;renderSnps();plotFst();plotPower();}
+function sync(){const g=pop.generation;setText('generation',number(g));$('play').disabled=!split||finished;$('step').disabled=!split||finished||stepPowerTarget!==null;setText('play',finished?'Fixed':running?'Pause':'Resume');$('play').setAttribute('aria-pressed',String(paused));$('calculate-power').setAttribute('aria-pressed',String(paused));setText('phase',split?(s.m?'Two seas. A connecting channel.':'Two seas. Complete isolation.'):'One sea. One population.');$('barrier-label').hidden=!split;$('channel-label').hidden=!split||!s.m;setText('fst-value','FST '+M.fst(pop.a,pop.b).toFixed(4));if(!split)setText('story','Choose Ne, m and your study design, then press Run simulation.');else if(!g)setText('story','The split has started. Both populations begin with identical allele frequencies.');else setText('story',s.m?`Generation ${g}: drift pulls the populations apart; migrants reconnect their gene pools.`:`Generation ${g}: no individuals cross. A genetic study may still miss the separation.`);if(finished)setText('story',`All ${s.loci} SNPs are fixed at generation ${number(g)}. Run again for a new history.`);const sorted=GreyDisplay.sorting([pop.a,pop.b]);setText('sorting-status',`${sorted.total-sorted.fixed}/${sorted.total} segregating · ${sorted.fixed-sorted.opposite}/${sorted.total} fixed identically · ${sorted.opposite}/${sorted.total} fixed differently.`);renderSnps();plotFst();plotPower();}
 function renderSnps(){
   const onlyVariable=$('segregating-only').checked;
   if(snpDisplayPop===pop&&snpDisplayFilter===onlyVariable)return;
@@ -53,12 +63,16 @@ function renderSnps(){
     const a=pop.a[l],b=pop.b[l],state=GreyDisplay.locusState(a,b);
     if(onlyVariable&&state!=='segregating')continue;
     shown++;
-    const bar=(side,p)=>`<div class="snp-frequency-row"><span>${side}</span><div class="snp-frequency-bar" role="meter" aria-label="SNP ${l+1}, ${side}, allele A frequency" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${100*p}" aria-valuetext="${GreyDisplay.allelePercent(p)}"><i style="width:${100*p}%"></i></div><b title="Allele A frequency: ${p}">${GreyDisplay.allelePercent(p)}</b></div>`;
+    const bar=(side,p)=>{
+      const fixed=state!=='segregating',a=GreyDisplay.allelePercent(p),b=GreyDisplay.allelePercent(1-p);
+      const label=fixed?`${p===1?'A':'B'} fixed · 100%`:`A ${a} · B ${b}`;
+      return `<div class="snp-frequency-row"><span>${side}</span><div class="snp-frequency-bar${fixed?' fixed':''}" role="meter" aria-label="SNP ${l+1}, ${side}, allele A frequency" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${100*p}" aria-valuetext="A ${a}, B ${b}"><i style="width:${fixed?100:100*p}%"></i></div><b title="Allele A: ${p}; allele B: ${1-p}">${label}</b></div>`;
+    };
     cards.push(`<article class="snp-card ${state}" data-locus="${l+1}"><div class="snp-card-heading"><strong>SNP ${l+1}</strong>${dots.has(l)?`<span class="snp-dot-badge">dot ${dots.get(l)}</span>`:''}</div><p class="snp-state">${labels[state]}</p>${bar('West',a)}${bar('East',b)}</article>`);
   }
   $('snp-frequencies').innerHTML=cards.join('');
   $('snp-empty').hidden=shown>0;
-  $('snp-list-count').textContent=`${number(shown)} of ${number(s.loci)} SNPs shown · allele A frequencies`;
+  $('snp-list-count').textContent=`${number(shown)} of ${number(s.loci)} SNPs shown · allele frequencies`;
 }
 
 function step(){pop=M.advance(pop,s,evolve);history.push({t:pop.generation,fst:M.fst(pop.a,pop.b)});if(history.length>2000)history=history.filter((_,i)=>i%2===0||i===history.length-1);if(worker)worker.postMessage({type:'advance',id:job,generation:pop.generation,population:pop,pauseAtTarget:paused});}
@@ -91,7 +105,8 @@ function plotPower(){
   $('power-chart').innerHTML=c.svg+'</svg>';
   $('power-chart').setAttribute('aria-label',`Live detection power through generation ${power?.max??0}; 80% guide.`);
   const checked=visible.at(-1);
-  $('power-now').textContent=!hasRun?'Press Run simulation to begin.':checked?`Generation ${checked.t}: ${checked.hits} / ${number(s.studies)} studies detect differentiation (${Math.round(checked.power*1000)/10}%).`+(checked.t<pop.generation?(paused?` Power estimate paused; live generation ${pop.generation}.`:` Updating to live generation ${pop.generation}…`):''):`Starting the ${number(s.studies)} study samples…`;
+  if(checked)valueLine('power-now',['Generation ',number(checked.t),': ',number(checked.hits),' / ',number(s.studies),' studies detect differentiation (',(checked.power*100).toFixed(1),'%).']);
+  else valueLine('power-now',[!hasRun?'Press Run simulation to begin.':`Starting the ${number(s.studies)} study samples…`]);
   showPowerResult();
 }
 function showPowerResult(){
@@ -108,16 +123,16 @@ function showPowerResult(){
     title='Not reached yet';short='Not reached yet';status=`Live generation ${number(pop.generation)}`;
     meaning=finished?'All SNPs are fixed. This history did not reach 80% detection power.':checked?`No generation has reached 80% detection power yet. Latest estimate: ${Math.round(100*checked.power)}% at generation ${number(checked.t)}.`:`Drawing ${number(s.studies)} study samples from the current populations. The generation number will appear here when detection power first reaches 80%.`;
   }
-  $('power-time').textContent=title;$('power-meaning').textContent=meaning;$('power-scene-time').textContent=short;$('power-status').textContent=status;
-  const checking=hasRun&&completedThrough<pop.generation;
-  $('power-progress').textContent=!hasRun?'READY':(finished?'FIXED':paused?(stepPowerTarget===null?'PAUSED':'STEPPING'):'RUNNING')+(checking?` · ${paused&&stepPowerTarget===null?"paused at":"checking"} generation ${number(pop.generation)} · ${progress?.generation===pop.generation?number(progress.done):0} / ${number(s.studies)} study samples`:` · generation ${number(pop.generation)} · ${number(s.studies)} study samples`);
-  $('power-note').textContent=`${number(s.studies)} study samples of this live population pair · Generation playback waits for each power estimate. FST and genetics continue after the first 80% crossing.`;
-  $('calculate-power').textContent=finished?'Run again':hasRun?(paused?'Resume simulation':'Pause simulation'):'Run simulation';
+  setText('power-time',title);setText('power-meaning',meaning);setText('power-scene-time',short);setText('power-status',status);
+  if(!hasRun)valueLine('power-progress',['READY']);
+  else valueLine('power-progress',['',finished?'FIXED':paused?(stepPowerTarget===null?'PAUSED':'STEPPING'):'RUNNING',' · generation ',number(pop.generation),' · ',number(s.studies),' study samples']);
+  setText('power-note',`${number(s.studies)} study samples of this live population pair · Generation playback waits for each power estimate. FST and genetics continue after the first 80% crossing.`);
+  setText('calculate-power',finished?'Run again':hasRun?(paused?'Resume simulation':'Pause simulation'):'Run simulation');
 }
 function acceptPower(data){power=data;completedThrough=Math.max(completedThrough,data.max);progress=null;if(isFixed()){finished=true;running=false;paused=true;accumulator=0;stopClocks();if(worker)worker.postMessage({type:'pause',id:job});}sync();}
 function calculatePower(){
   stopWorker();power=null;pendingPower=null;progress=null;pendingProgress=null;completedThrough=-1;stepPowerTarget=null;const id=job;
-  try{worker=new Worker('power-worker.js?v=sea-life-12');}catch(err){running=false;paused=true;sync();$('power-time').textContent='Power unavailable';return;}
+  try{worker=new Worker('power-worker.js?v=steady-text-13');}catch(err){running=false;paused=true;sync();setText('power-time','Power unavailable');return;}
   worker.onmessage=event=>{
     const data=event.data;if(data.id!==job)return;
     if(data.type==='progress'){if(paused&&stepPowerTarget===null){pendingProgress=data;return;}progress=data;showPowerResult();return;}
@@ -127,9 +142,12 @@ function calculatePower(){
     if(paused&&stepPowerTarget===null){pendingPower=data;return;}
     if(stepPowerTarget!==null&&data.max>stepPowerTarget){pendingPower=data;return;}
     acceptPower(data);
-    if(paused&&stepPowerTarget!==null&&data.max>=stepPowerTarget){stepPowerTarget=null;worker.postMessage({type:'pause',id:job});sync();}
+    if(paused&&stepPowerTarget!==null){
+      if(finished||data.max>=stepPowerTarget){stepPowerTarget=null;worker.postMessage({type:'pause',id:job});sync();}
+      else if(completedThrough>=pop.generation){step();sync();drawScene();}
+    }
   };
-  worker.onerror=()=>{if(id!==job)return;setPlayback(false);stopWorker();$('power-time').textContent='Power unavailable';$('power-meaning').textContent='Reload the page to retry the live estimate.';};
+  worker.onerror=()=>{if(id!==job)return;setPlayback(false);stopWorker();setText('power-time','Power unavailable');setText('power-meaning','Reload the page to retry the live estimate.');};
   worker.postMessage({type:'init',settings:s,id,seed:runSeed^0x724ba719,population:pop});
 }
 function setPlayback(play){
@@ -145,7 +163,11 @@ function togglePower(){if(!hasRun||!worker||finished){startRun();return;}toggleP
 function singleStep(){
   setPlayback(false);stepPowerTarget=pop.generation+1;
   if(pendingPower){acceptPower(pendingPower);pendingPower=null;}
-  step();sync();drawScene();
+  if(finished){stepPowerTarget=null;sync();return;}
+  // A click during resampling first finishes that batch, then advances once.
+  if(completedThrough>=pop.generation)step();
+  else if(worker)worker.postMessage({type:'resume',id:job});
+  sync();drawScene();
 }
 function takeSample(){if(!split)return;const result=M.sample(pop,s,observe),detected=result.p<=.05;if(lastSampleGen!==pop.generation){sampleResults=[];lastSampleGen=pop.generation;}sampleResults.push(detected);$('sample-generation').textContent='GEN '+pop.generation;$('sample-result').className='sample-result '+(detected?'detected':'missed');$('sample-result').innerHTML=`<span class="sample-icon">${detected?'✓':'≈'}</span><strong>${detected?'Difference detected':'No difference detected'}</strong><p>p ${result.p<.0001?'< 0.0001':'= '+result.p.toFixed(4)} · sampled FST ${result.fst.toFixed(4)}<br>${detected?'This sample supports genetic differentiation.':s.m?'A non-significant test does not establish panmixia.':'The populations are isolated; this sample does not reveal it.'}</p>`;$('sample-history').textContent=`At generation ${pop.generation}: ${sampleResults.filter(Boolean).length} of ${sampleResults.length} samples detected a difference. The power curve repeats this sampling ${number(s.studies)} times at each generation.`;$('take-sample').innerHTML='Sample again <span>→</span>';}
 function resize(){ocean.resize();if(s)drawScene();}

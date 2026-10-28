@@ -27,3 +27,7 @@ The All SNPs panel lists every numerical locus in order, in two columns on deskt
 Hammerhead remains the default, using the accepted shark renderer and swimming movement. Classic shark remains available. The Animal menu also offers sea turtle, the original blue-and-yellow surgeonfish (Blue tang), tuna, orca and harbour seal. Switching artwork keeps the current population history, allele frequencies, samples, actor positions and pause state. All choices support the same SNP overlay and numeric genotype close-up.
 
 The landmass emerges over 4.8 seconds, with a submerged sand ridge, displacement ripples, wet beach, foam, dune detail and coconut palms with pinnate fronds. The settled terrain is cached. Palm sway, foam and animal motion all use the shared scene clock, so both Pause controls freeze them. The migration channel still uses the same gap dimensions.
+
+Live result text keeps its label nodes and updates numerical values in place. The status line no longer switches between checking/completed wording at each generation. +1 generation stays available during live resampling: a click pauses playback, finishes the current batch, advances exactly one generation and completes that batch while remaining paused.
+
+The SNP panel describes population allele frequencies, with separate A and B percentages and a frequency-only legend. At fixation, bars are full state colours and name the fixed allele; a fixed B is never represented by an empty grey background. Individual 0/1/2 genotypes remain in Animal close-up.

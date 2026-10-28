@@ -10,14 +10,19 @@ function app(overrides={}){
   const elements=new Map(),listeners={},gradient={addColorStop(){}};
   const drawing=new Proxy({createLinearGradient:()=>gradient,createRadialGradient:()=>gradient},{get:(o,k)=>o[k]||(()=>{})});
   const defaults={total:20000,ratio:50,migration:0,'sample-size':40,loci:50,speed:6,'travel-speed':.95,'shark-design':'hammer',...overrides};
+  function textNode(value){return {nodeType:3,data:String(value)};}
   function element(id){
-    if(!elements.has(id))elements.set(id,{value:String(defaults[id]??''),checked:false,disabled:false,hidden:false,style:{},options:[],textContent:'',attributes:{},
+    if(!elements.has(id))elements.set(id,{value:String(defaults[id]??''),checked:false,disabled:false,hidden:false,style:{},options:[],childNodes:[],attributes:{},
+      get firstChild(){return this.childNodes[0];},
+      get textContent(){return this.childNodes.map(n=>n.data).join('');},
+      set textContent(value){this.childNodes=[textNode(value)];},
+      replaceChildren(...nodes){this.childNodes=nodes;},
       setAttribute(name,value){this.attributes[name]=value;},addEventListener(){},
       getContext:()=>drawing,getBoundingClientRect:()=>({width:940,height:540})});
     return elements.get(id);
   }
   let time=1000,scene,timerId=0,frameId=0,framesRun=0,seed=100;const timers=new Map(),frames=new Map(),workers=[];
-  const document={hidden:false,getElementById:element,createElement:()=>({getContext:()=>drawing}),addEventListener:(event,fn)=>{listeners[event]=fn;}};
+  const document={hidden:false,getElementById:element,createTextNode:textNode,createElement:()=>({getContext:()=>drawing}),addEventListener:(event,fn)=>{listeners[event]=fn;}};
   const world={Math,Number,document,crypto:{getRandomValues(value){value[0]=++seed;return value;}},setTimeout:fn=>{timers.set(++timerId,fn);return timerId;},clearTimeout:id=>timers.delete(id),Worker:class{
       constructor(){workers.push(this);this.points=[];}
       postMessage(data){
@@ -138,8 +143,8 @@ test('generation playback waits for each 1000-study estimate while the sharks ke
   w.onmessage({data:{id,max:0,reps:1000,points:[{t:0,power:.05,hits:50}]}});
   a.tick(60);assert.equal(Number(a.state().generation),1);assert.equal(w.lastAdvance.generation,1);
   const before=a.state();a.tick(60);assert.equal(Number(a.state().generation),1);assert.notEqual(a.state().animals,before.animals);
-  w.onmessage({data:{type:'progress',id,generation:1,done:500,reps:1000}});assert.match(a.element('power-progress').textContent,/500 \/ 1,000/);
-  assert(a.element('step').disabled);
+  w.onmessage({data:{type:'progress',id,generation:1,done:500,reps:1000}});assert.match(a.element('power-progress').textContent,/RUNNING · generation 1 · 1,000 study samples/);
+  assert(!a.element('step').disabled,'Step stays available while a generation is being sampled');
   w.onmessage({data:{id,max:1,reps:1000,points:[{t:0,power:.05,hits:50},{t:1,power:.1,hits:100}]}});
   a.tick();assert.equal(Number(a.state().generation),2);a.tick(60);assert.equal(Number(a.state().generation),2);
 });
@@ -237,4 +242,52 @@ test('animal selection preserves the live history, markers and pause state for e
     a.click('calculate-power');a.tick(6);assert(a.state().clock>before.clock);
     a.click('play');const paused=a.state();a.tick(20);assert.deepEqual(a.state(),paused);
   }
+});
+
+
+test('live status labels retain their nodes and +1 does not blink during resampling',()=>{
+  const a=app({total:100,autoPower:false});a.click('split');const w=a.workers[0],id=w.initialRequest.id;
+  const initial={t:0,power:.05,hits:50};w.onmessage({data:{id,max:0,points:[initial]}});
+  const progressNodes=a.element('power-progress').childNodes.slice(),resultNodes=a.element('power-now').childNodes.slice();
+  a.tick(60);assert.equal(Number(a.state().generation),1);assert(!a.element('step').disabled);
+  for(const done of [0,100,500,999]){
+    w.onmessage({data:{type:'progress',id,generation:1,done,reps:1000}});
+    assert.equal(a.element('power-progress').textContent,'RUNNING · generation 1 · 1,000 study samples');
+    assert.equal(a.element('power-now').textContent,'Generation 0: 50 / 1,000 studies detect differentiation (5.0%).');
+    assert(!a.element('step').disabled);
+    a.element('power-progress').childNodes.forEach((node,i)=>assert.equal(node,progressNodes[i]));
+    a.element('power-now').childNodes.forEach((node,i)=>assert.equal(node,resultNodes[i]));
+  }
+  w.onmessage({data:{id,max:1,points:[initial,{t:1,power:.996,hits:996}]}});
+  assert.equal(a.element('power-now').textContent,'Generation 1: 996 / 1,000 studies detect differentiation (99.6%).');
+  a.element('power-now').childNodes.forEach((node,i)=>assert.equal(node,resultNodes[i]));
+  a.click('reset');assert.equal(a.element('power-progress').textContent,'READY');a.click('split');assert.match(a.element('power-progress').textContent,/RUNNING/);
+});
+
+test('+1 during an unfinished batch finishes it before advancing exactly once, and stays paused',()=>{
+  const a=app({total:100,autoPower:false});a.click('split');const w=a.workers[0],id=w.initialRequest.id;
+  const initial={t:0,power:.05,hits:50};w.onmessage({data:{id,max:0,points:[initial]}});a.tick(60);
+  const before=a.state();assert.equal(Number(before.generation),1);a.click('step');
+  assert.equal(a.state().generation,before.generation);assert(a.element('step').disabled);assert.equal(w.request.type,'resume');
+  const second={t:1,power:.1,hits:100};w.onmessage({data:{id,max:1,points:[initial,second]}});
+  assert.equal(Number(a.state().generation),2);assert.equal(w.lastAdvance.generation,2);assert(a.element('step').disabled);
+  w.onmessage({data:{id,max:2,points:[initial,second,{t:2,power:.2,hits:200}]}});
+  assert(!a.element('step').disabled);assert.equal(a.element('play').textContent,'Resume');
+  const done=a.state();a.tick(120);assert.deepEqual(a.state(),done);assert.equal(a.pendingClocks().frames,0);
+});
+
+test('population bars name both alleles and show full state colours for fixed A or fixed B',()=>{
+  const a=app({total:20,loci:5,advanceOverride:()=>({a:[0,1,0,1,.25],b:[0,1,1,0,.75],generation:1})});
+  a.click('split');a.click('step');const html=a.element('snp-frequencies').innerHTML;
+  const cards=html.split('<article').slice(1);
+  for(let i=0;i<4;i++){
+    assert.equal((cards[i].match(/snp-frequency-bar fixed/g)||[]).length,2);
+    assert.equal((cards[i].match(/width:100%/g)||[]).length,2);
+  }
+  assert.match(cards[0],/B fixed · 100%/);assert.match(cards[1],/A fixed · 100%/);
+  assert.match(cards[2],/B fixed · 100%/);assert.match(cards[2],/A fixed · 100%/);
+  assert.match(cards[4],/A 25% · B 75%/);assert.match(cards[4],/A 75% · B 25%/);
+  const source=fs.readFileSync(path.join(__dirname,'../animation/index.html'),'utf8');
+  const panel=source.split('id="snp-panel"')[1].split('</article>')[0];
+  assert(!panel.includes('genotype-key'));assert(!panel.includes('A/B'));assert(panel.includes('frequency-key'));
 });
