@@ -1,10 +1,10 @@
 // Study resampling of the exact live population pair; no demographic simulation.
-importScripts('model.js?v=fst-range-9');
+importScripts('model.js?v=thousand-studies-10');
 let batch=null;
 onmessage=function(event){
   const message=event.data;
   if(message.type==='init'){
-    batch={s:message.settings,id:message.id,seed:message.seed,reps:500,
+    batch={s:message.settings,id:message.id,seed:message.seed,reps:1000,
       observe:GreyModel.rng((Number(message.seed)>>>0)^0x49c1a72d),
       points:[],first:null,task:null,scheduled:false,paused:false,lastProgress:0};
     beginStudy(message.population,false);

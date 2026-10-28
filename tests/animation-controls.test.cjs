@@ -21,9 +21,9 @@ function app(overrides={}){
   const world={Math,Number,document,crypto:{getRandomValues(value){value[0]=++seed;return value;}},setTimeout:fn=>{timers.set(++timerId,fn);return timerId;},clearTimeout:id=>timers.delete(id),Worker:class{
       constructor(){workers.push(this);this.points=[];}
       postMessage(data){
-        this.request=data;if(data.type==='init'){this.initialRequest=data;this.points=[{t:data.population?.generation??0,power:.05,hits:25}];}
-        if(data.type==='advance'){this.lastAdvance=data;this.points.push({t:data.generation,power:.05,hits:25});}
-        if(overrides.autoPower!==false&&(data.type==='init'||data.type==='advance'))this.onmessage({data:{id:data.id,max:data.population?.generation??data.generation??0,reps:500,points:this.points.map(p=>({...p}))}});
+        this.request=data;if(data.type==='init'){this.initialRequest=data;this.points=[{t:data.population?.generation??0,power:.05,hits:50}];}
+        if(data.type==='advance'){this.lastAdvance=data;this.points.push({t:data.generation,power:.05,hits:50});}
+        if(overrides.autoPower!==false&&(data.type==='init'||data.type==='advance'))this.onmessage({data:{id:data.id,max:data.population?.generation??data.generation??0,reps:1000,points:this.points.map(p=>({...p}))}});
       }
       terminate(){this.terminated=true;}
     },devicePixelRatio:1,matchMedia:()=>({matches:false}),performance:{now:()=>time},
@@ -73,12 +73,12 @@ test('single-step stays paused, changing tabs does not stop the run, and Reset r
 test('live power follows the clock, stays running after detection and reruns have fresh seeds',()=>{
   const a=app({autoPower:false});assert.equal(a.workers.length,0);a.click('split');const w=a.workers[0],id=w.request.id;
   assert.equal(w.request.type,'init');assert.equal(typeof w.request.seed,'number');assert.equal(w.request.population.generation,0);
-  w.onmessage({data:{id,max:0,reps:500,points:[{t:0,power:.05,hits:25}]}});
+  w.onmessage({data:{id,max:0,reps:1000,points:[{t:0,power:.05,hits:50}]}});
   a.click('step');assert.equal(w.request.type,'advance');assert.equal(w.request.generation,1);assert.equal(w.request.population.generation,1);
-  w.onmessage({data:{id,max:1,points:[{t:0,power:.05,hits:25},{t:1,power:.6,hits:300}]}});
+  w.onmessage({data:{id,max:1,points:[{t:0,power:.05,hits:50},{t:1,power:.6,hits:600}]}});
   assert.equal(a.element('power-time').textContent,'Not reached yet');
   a.click('step');
-  w.onmessage({data:{id,max:2,points:[{t:0,power:.05,hits:25},{t:1,power:.6,hits:300},{t:2,power:.85,hits:425}]}});
+  w.onmessage({data:{id,max:2,points:[{t:0,power:.05,hits:50},{t:1,power:.6,hits:600},{t:2,power:.85,hits:850}]}});
   assert.equal(a.element('power-time').textContent,'2');assert.equal(a.element('power-unit').hidden,false);assert.match(a.element('power-scene-time').textContent,/2 generations/);assert(!w.terminated);
   const seed=a.workers[0].initialRequest.seed;a.click('split');assert.notEqual(a.workers[1].request.seed,seed);
 });
@@ -117,11 +117,11 @@ test('isolated 100-individual live history fixes the ten displayed SNPs and keep
 
 test('Pause freezes queued power results and both charts; Resume applies them without changing the crossing number',()=>{
   const a=app({total:100,autoPower:false});a.click('split');const w=a.workers[0],id=w.initialRequest.id;
-  w.onmessage({data:{id,max:0,reps:500,points:[{t:0,power:.05,hits:25}]}});
-  a.tick(30);w.onmessage({data:{id,max:1,reps:500,points:[{t:0,power:.05,hits:25},{t:1,power:.65,hits:325}]}});
+  w.onmessage({data:{id,max:0,reps:1000,points:[{t:0,power:.05,hits:50}]}});
+  a.tick(30);w.onmessage({data:{id,max:1,reps:1000,points:[{t:0,power:.05,hits:50},{t:1,power:.65,hits:650}]}});
   a.tick(30);a.click('play');assert.equal(w.request.type,'pause');
   const before={title:a.element('power-time').textContent,curve:a.element('power-chart').innerHTML,now:a.element('power-now').textContent,fst:a.element('fst-chart').innerHTML};
-  w.onmessage({data:{id,max:2,points:[{t:0,power:.05,hits:25},{t:1,power:.65,hits:325},{t:2,power:.9,hits:450}]}});
+  w.onmessage({data:{id,max:2,points:[{t:0,power:.05,hits:50},{t:1,power:.65,hits:650},{t:2,power:.9,hits:900}]}});
   a.tick(60);
   assert.deepEqual({title:a.element('power-time').textContent,curve:a.element('power-chart').innerHTML,now:a.element('power-now').textContent,fst:a.element('fst-chart').innerHTML},before);
   a.click('play');assert.equal(w.request.type,'resume');assert.equal(a.element('power-time').textContent,'2');
@@ -131,16 +131,16 @@ test('Pause freezes queued power results and both charts; Resume applies them wi
 });
 
 
-test('generation playback waits for each 500-study estimate while the sharks keep swimming',()=>{
+test('generation playback waits for each 1000-study estimate while the sharks keep swimming',()=>{
   const a=app({total:20,autoPower:false});a.click('split');const w=a.workers[0],id=w.initialRequest.id;
-  assert.equal(w.initialRequest.settings.studies,500);
+  assert.equal(w.initialRequest.settings.studies,1000);
   a.tick(120);assert.equal(Number(a.state().generation),0);
-  w.onmessage({data:{id,max:0,reps:500,points:[{t:0,power:.05,hits:25}]}});
+  w.onmessage({data:{id,max:0,reps:1000,points:[{t:0,power:.05,hits:50}]}});
   a.tick(60);assert.equal(Number(a.state().generation),1);assert.equal(w.lastAdvance.generation,1);
   const before=a.state();a.tick(60);assert.equal(Number(a.state().generation),1);assert.notEqual(a.state().animals,before.animals);
-  w.onmessage({data:{type:'progress',id,generation:1,done:250,reps:500}});assert.match(a.element('power-progress').textContent,/250 \/ 500/);
+  w.onmessage({data:{type:'progress',id,generation:1,done:500,reps:1000}});assert.match(a.element('power-progress').textContent,/500 \/ 1,000/);
   assert(a.element('step').disabled);
-  w.onmessage({data:{id,max:1,reps:500,points:[{t:0,power:.05,hits:25},{t:1,power:.1,hits:50}]}});
+  w.onmessage({data:{id,max:1,reps:1000,points:[{t:0,power:.05,hits:50},{t:1,power:.1,hits:100}]}});
   a.tick();assert.equal(Number(a.state().generation),2);a.tick(60);assert.equal(Number(a.state().generation),2);
 });
 
@@ -178,11 +178,11 @@ test('pausing in a background tab cancels every timer and resumes with one clock
 test('FST sampling band uses only completed live generations, shows negative estimates and freezes with either Pause control',()=>{
   const a=app({total:20,autoPower:false});a.click('split');const w=a.workers[0],id=w.initialRequest.id;
   assert(!a.element('fst-chart').innerHTML.includes('fst-sampling-band'));
-  const initial={t:0,power:.05,hits:25,sampleFstLow:-.03,sampleFstHigh:.08};
+  const initial={t:0,power:.05,hits:50,sampleFstLow:-.03,sampleFstHigh:.08};
   w.onmessage({data:{id,max:0,points:[initial]}});a.tick(30);
   a.click('play');const frozen=a.element('fst-chart').innerHTML;
   assert(frozen.includes('fst-sampling-band'));assert(frozen.includes('-0.05'));
-  const later={t:1,power:.2,hits:100,sampleFstLow:.01,sampleFstHigh:.2};
+  const later={t:1,power:.2,hits:200,sampleFstLow:.01,sampleFstHigh:.2};
   w.onmessage({data:{id,max:1,points:[initial,later]}});
   assert.equal(a.element('fst-chart').innerHTML,frozen);
   assert.match(a.element('fst-interval').textContent,/generation 0: -0.0300 to 0.0800/);

@@ -2,7 +2,7 @@
 'use strict';
 const M=GreyModel,$=id=>document.getElementById(id),canvas=$('scene'),ocean=new OceanScene(canvas);
 let s,pop,evolve,observe,split=false,running=false,paused=false,history=[],power=null,pendingPower=null,progress=null,pendingProgress=null,completedThrough=-1,stepPowerTarget=null,worker=null,job=0,sampleResults=[],lastSampleGen=-1,last=0,accumulator=0,hasRun=false,runSeed=0,seedCounter=0,finished=false,backgroundTimer=null,animationFrame=null;
-function settings(){return {total:+$('total').value,ratio:+$('ratio').value,m:+$('migration').value,sample:+$('sample-size').value,loci:+$('loci').value,studies:500};}
+function settings(){return {total:+$('total').value,ratio:+$('ratio').value,m:+$('migration').value,sample:+$('sample-size').value,loci:+$('loci').value,studies:1000};}
 function number(x){return x.toLocaleString('en-GB');}
 function isFixed(){const state=GreyDisplay.sorting([pop.a,pop.b]);return state.fixed===s.loci&&(s.m===0||state.opposite===0);}
 function freshSeed(){
@@ -57,7 +57,7 @@ function plotFst(){
   }
   c.svg+=`<polyline points="${history.map(d=>c.x(d.t)+','+c.y(d.fst)).join(' ')}" fill="none" stroke="#26938d" stroke-width="2.4"/><circle cx="${c.x(pop.generation)}" cy="${c.y(history.at(-1).fst)}" r="3" fill="#1c7877"/></svg>`;
   $('fst-chart').innerHTML=c.svg;
-  const latest=samples.at(-1),range=latest?`95% sampled FST range at generation ${latest.t}: ${latest.sampleFstLow.toFixed(4)} to ${latest.sampleFstHigh.toFixed(4)}`:'The 95% sampled FST range appears after the first 500 study samples.';
+  const latest=samples.at(-1),range=latest?`95% sampled FST range at generation ${latest.t}: ${latest.sampleFstLow.toFixed(4)} to ${latest.sampleFstHigh.toFixed(4)}`:`The 95% sampled FST range appears after the first ${number(s.studies)} study samples.`;
   $('fst-chart').setAttribute('aria-label',`True differentiation at generation ${pop.generation}: FST ${history.at(-1).fst.toFixed(4)}. ${range}`);
   $('fst-interval').textContent=range;
 }
@@ -98,7 +98,7 @@ function showPowerResult(){
 function acceptPower(data){power=data;completedThrough=Math.max(completedThrough,data.max);progress=null;if(isFixed()){finished=true;running=false;paused=true;accumulator=0;stopClocks();if(worker)worker.postMessage({type:'pause',id:job});}sync();}
 function calculatePower(){
   stopWorker();power=null;pendingPower=null;progress=null;pendingProgress=null;completedThrough=-1;stepPowerTarget=null;const id=job;
-  try{worker=new Worker('power-worker.js?v=fst-range-9');}catch(err){running=false;paused=true;sync();$('power-time').textContent='Power unavailable';return;}
+  try{worker=new Worker('power-worker.js?v=thousand-studies-10');}catch(err){running=false;paused=true;sync();$('power-time').textContent='Power unavailable';return;}
   worker.onmessage=event=>{
     const data=event.data;if(data.id!==job)return;
     if(data.type==='progress'){if(paused&&stepPowerTarget===null){pendingProgress=data;return;}progress=data;showPowerResult();return;}
@@ -128,7 +128,7 @@ function singleStep(){
   if(pendingPower){acceptPower(pendingPower);pendingPower=null;}
   step();sync();drawScene();
 }
-function takeSample(){if(!split)return;const result=M.sample(pop,s,observe),detected=result.p<=.05;if(lastSampleGen!==pop.generation){sampleResults=[];lastSampleGen=pop.generation;}sampleResults.push(detected);$('sample-generation').textContent='GEN '+pop.generation;$('sample-result').className='sample-result '+(detected?'detected':'missed');$('sample-result').innerHTML=`<span class="sample-icon">${detected?'✓':'≈'}</span><strong>${detected?'Difference detected':'No difference detected'}</strong><p>p ${result.p<.0001?'< 0.0001':'= '+result.p.toFixed(4)} · sampled FST ${result.fst.toFixed(4)}<br>${detected?'This sample supports genetic differentiation.':s.m?'A non-significant test does not establish panmixia.':'The populations are isolated; this sample does not reveal it.'}</p>`;$('sample-history').textContent=`At generation ${pop.generation}: ${sampleResults.filter(Boolean).length} of ${sampleResults.length} samples detected a difference. The power curve repeats this sampling 500 times at each generation.`;$('take-sample').innerHTML='Sample again <span>→</span>';}
+function takeSample(){if(!split)return;const result=M.sample(pop,s,observe),detected=result.p<=.05;if(lastSampleGen!==pop.generation){sampleResults=[];lastSampleGen=pop.generation;}sampleResults.push(detected);$('sample-generation').textContent='GEN '+pop.generation;$('sample-result').className='sample-result '+(detected?'detected':'missed');$('sample-result').innerHTML=`<span class="sample-icon">${detected?'✓':'≈'}</span><strong>${detected?'Difference detected':'No difference detected'}</strong><p>p ${result.p<.0001?'< 0.0001':'= '+result.p.toFixed(4)} · sampled FST ${result.fst.toFixed(4)}<br>${detected?'This sample supports genetic differentiation.':s.m?'A non-significant test does not establish panmixia.':'The populations are isolated; this sample does not reveal it.'}</p>`;$('sample-history').textContent=`At generation ${pop.generation}: ${sampleResults.filter(Boolean).length} of ${sampleResults.length} samples detected a difference. The power curve repeats this sampling ${number(s.studies)} times at each generation.`;$('take-sample').innerHTML='Sample again <span>→</span>';}
 function resize(){ocean.resize();if(s)drawScene();}
 function drawScene(){ocean.draw({split,paused,generation:pop.generation,m:s.m,generationRate:running?Number($('speed').value):0,p1:pop.a,p2:pop.b,markers:$('show-markers').checked});$('meet-shark').setAttribute('aria-pressed',String(ocean.selected>=0));}
 function advanceClock(now){const dt=last?Math.min(.1,(now-last)/1000):0;last=now;if(running){accumulator=Math.min(1,accumulator+dt*(+$('speed').value));if(accumulator>=1&&worker&&completedThrough>=pop.generation){accumulator=0;step();sync();}}}
