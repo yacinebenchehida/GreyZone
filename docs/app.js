@@ -23,7 +23,7 @@ function stopWorker(){if(worker)worker.terminate();worker=null;job++;}
 function animalLabels(){
   const d=ocean.display,kind=SeaLife.info(ocean.variant);
   $('shown-west').textContent=number(d.west)+' '+kind.plural+' shown';$('shown-east').textContent=number(d.east)+' '+kind.plural+' shown';
-  $('display-scale').textContent=number(d.total)+' '+kind.plural+' shown · '+(d.exact?'1 animal = 1 individual':'1 animal ≈ '+number(Math.round(d.weight))+' individuals')+' · SNP display: '+Math.min(10,s.loci)+' of '+s.loci+' markers';
+  $('display-scale').textContent=number(d.total)+' '+kind.plural+' shown · '+(d.exact?'1 animal = 1 individual':'1 animal ≈ '+number(Math.round(d.weight))+' individuals')+' · SNPs shown: '+(s.loci===1?'1':'1–'+Math.min(10,s.loci))+' of '+s.loci;
   $('scene').setAttribute('aria-label',`An ocean seen from above, with ${kind.plural} swimming. A sandy landmass rises to separate the populations, with coconut palms on it.`);
 }
 function prepareActors(){ocean.reset(s);ocean.travelPace=Number($('travel-speed').value);ocean.variant=$('shark-design').value;animalLabels();}
@@ -56,7 +56,7 @@ function renderSnps(){
   const onlyVariable=$('segregating-only').checked;
   if(snpDisplayPop===pop&&snpDisplayFilter===onlyVariable)return;
   snpDisplayPop=pop;snpDisplayFilter=onlyVariable;
-  const dots=new Map(GreyDisplay.markerIndices(s.loci).map((l,i)=>[l,i+1]));
+  const animalSnps=new Set(GreyDisplay.markerIndices(s.loci));
   const labels={'segregating':'Segregating','shared-fixed':'Fixed identically','opposite-fixed':'Fixed differently'};
   let shown=0;const cards=[];
   for(let l=0;l<s.loci;l++){
@@ -68,7 +68,7 @@ function renderSnps(){
       const label=fixed?`${p===1?'A':'B'} fixed · 100%`:`A ${a} · B ${b}`;
       return `<div class="snp-frequency-row"><span>${side}</span><div class="snp-frequency-bar${fixed?' fixed':''}" role="meter" aria-label="SNP ${l+1}, ${side}, allele A frequency" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${100*p}" aria-valuetext="A ${a}, B ${b}"><i style="width:${fixed?100:100*p}%"></i></div><b title="Allele A: ${p}; allele B: ${1-p}">${label}</b></div>`;
     };
-    cards.push(`<article class="snp-card ${state}" data-locus="${l+1}"><div class="snp-card-heading"><strong>SNP ${l+1}</strong>${dots.has(l)?`<span class="snp-dot-badge">dot ${dots.get(l)}</span>`:''}</div><p class="snp-state">${labels[state]}</p>${bar('West',a)}${bar('East',b)}</article>`);
+    cards.push(`<article class="snp-card ${state}" data-locus="${l+1}"><div class="snp-card-heading"><strong>SNP ${l+1}</strong>${animalSnps.has(l)?`<span class="snp-dot-badge">On animal</span>`:''}</div><p class="snp-state">${labels[state]}</p>${bar('West',a)}${bar('East',b)}</article>`);
   }
   $('snp-frequencies').innerHTML=cards.join('');
   $('snp-empty').hidden=shown>0;
@@ -136,7 +136,7 @@ function showPowerResult(){
 function acceptPower(data){power=data;completedThrough=Math.max(completedThrough,data.max);progress=null;if(isFixed()&&PowerResult.summary(data).status!=='confirming'){finished=true;running=false;paused=true;accumulator=0;stopClocks();if(worker)worker.postMessage({type:'pause',id:job});}sync();}
 function calculatePower(){
   stopWorker();power=null;pendingPower=null;progress=null;pendingProgress=null;completedThrough=-1;stepPowerTarget=null;const id=job;
-  try{worker=new Worker('power-worker.js?v=mobile-render-16');}catch(err){running=false;paused=true;sync();setText('power-time','Power unavailable');return;}
+  try{worker=new Worker('power-worker.js?v=first-snps-18');}catch(err){running=false;paused=true;sync();setText('power-time','Power unavailable');return;}
   worker.onmessage=event=>{
     const data=event.data;if(data.id!==job)return;
     if(data.type==='progress'){if(paused&&stepPowerTarget===null){pendingProgress=data;return;}progress=data;showPowerResult();return;}

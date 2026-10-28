@@ -12,7 +12,7 @@ The run continues until you pause it or every model SNP is in a stable fixed sta
 
 Pause cancels the animation-frame loop and background timer, freezing generations, sharks, water and study sampling. Resume retains the same history and sampling RNG state. +1 generation leaves playback paused and calculates its 1000 study samples. Both Pause buttons use the same controls. The clock waits for any unfinished study calculation before advancing, while the sharks keep swimming. Generation speed limits remain Slow 1.5, Normal 6 and Fast 25 gen/s; swimming speed is separate.
 
-**Four SNP colours:** light gold/orange = still segregating within at least one basin; grey = the same allele fixed in both basins; turquoise west and coral east = different alleles fixed. Gold marker fill encodes allele-A dosage: empty = 0 (B/B), half-filled = 1 (A/B), filled = 2 (A/A). Shark close-up shows readable 0/1/2 values, genotype labels, SNP numbers and matching dot numbers, including when the overview dots are hidden. Raw genotype copies remain unchanged. Each dot position is the same marker across animals. Up to ten actual model loci are displayed.
+**Four SNP colours:** light gold/orange = still segregating within at least one basin; grey = the same allele fixed in both basins; turquoise west and coral east = different alleles fixed. Gold marker fill encodes allele-A dosage: empty = 0 (B/B), half-filled = 1 (A/B), filled = 2 (A/A). Animal close-up shows readable 0/1/2 values, genotype labels and matching SNP numbers, including when the overview dots are hidden. Raw genotype copies remain unchanged. Each dot position is the same marker across animals. The animals always show SNPs 1–10, or all selected SNPs if fewer than ten. There is no separate dot numbering. With ten markers, SNPs 1–5 run head-to-tail along the animal’s left side, and 6–10 along its right side. Five or fewer run along the centreline. The close-up states this orientation.
 
 Migration is the receiving gene-pool proportion m, 0 ≤ m < 1. Single illustrative crossings become more frequent with m and are limited to three sharks in transit. They do not count every numerical migrant or implement individual pedigrees. Counts are exact through 200 and logarithmically compressed above that; the display scale is labelled.
 
@@ -20,7 +20,7 @@ Migration is the receiving gene-pool proportion m, 0 ≤ m < 1. Single illustrat
 
 [Earlier fish study](https://yacinebenchehida.github.io/GreyZone/fish-study.html) · [Shark designs](https://yacinebenchehida.github.io/GreyZone/shark-study.html)
 
-The All SNPs panel lists every numerical locus in order, in two columns on desktop and one on narrow phones, within a scrollable region. Each SNP keeps its west/east allele-A bars together and reports exact fixation status. Up to ten dot badges link the list to the animals. Segregating only is an optional display filter; the summary, evolution and tests still use every selected SNP. Near-endpoint labels use <0.01% and >99.99% instead of rounding an unfixed locus to 0% or 100%.
+The All SNPs panel lists every numerical locus in order, in two columns on desktop and one on narrow phones, within a scrollable region. Each SNP keeps its west/east allele-A bars together and reports exact fixation status. “On animal” badges mark SNPs 1–10 (or all SNPs if fewer). Segregating only is an optional display filter; the summary, evolution and tests still use every selected SNP. Near-endpoint labels use <0.01% and >99.99% instead of rounding an unfixed locus to 0% or 100%.
 
 ## Animal and landscape artwork
 

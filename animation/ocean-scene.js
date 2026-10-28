@@ -127,20 +127,20 @@ class OceanScene{
     const x=clamp(a.x*this.w+25,w/2+12,this.w-w/2-12),y=clamp(a.y*this.h-160,top,Math.max(top,this.h-h-65));
     c.save();c.shadowColor='#002e4a33';c.shadowBlur=12;c.shadowOffsetY=5;c.fillStyle='#f4f4e9fa';c.strokeStyle='#c3d8cb';c.lineWidth=1;c.beginPath();c.roundRect(x-w/2,y,w,h,14);c.fill();c.shadowBlur=0;c.shadowOffsetY=0;c.stroke();
     c.fillStyle='#31575c';c.font='13px Georgia, serif';c.textAlign='center';c.fillText(SeaLife.info(this.variant).name+', up close',x,y+24);
-    c.fillStyle='#72877f';c.font='10px Arial, sans-serif';c.fillText(`${a.side?'Eastern':'Western'} sea · ${SeaLife.info(this.variant).singular} ${a.id+1}`,x,y+43);
+    c.fillStyle='#72877f';c.font='10px Arial, sans-serif';c.fillText(`${a.side?'Eastern':'Western'} sea · ${SeaLife.info(this.variant).singular} ${a.id+1} · ${indices.length}/${state.p1.length} SNPs`,x,y+43);
     SeaLife.draw(c,{x:x+18,y:y+89,scale:.90*SeaLife.info(this.variant).portrait,heading:0,stroke:a.stroke,effort:a.effort,bend:a.bend,phase:a.phase,id:a.id},this.clock,{variant:this.variant||'hammer',snps:pairs,snpPalettes:this.markerCache.palettes});
     c.fillStyle='#31575c';c.font='10px Arial, sans-serif';c.fillText('Genotype = 0, 1 or 2 copies of allele A',x,y+139);
     const cw=Math.min(52,(w-24)/columns),start=x-columns*cw/2;
     for(let i=0;i<indices.length;i++){
       const cx=start+(i%5)*cw+cw/2,cy=y+153+Math.floor(i/5)*56,dose=GreyDisplay.dosage(pairs[i]);
       c.fillStyle='#e9eee2';c.beginPath();c.roundRect(cx-cw/2+2,cy,cw-4,54,5);c.fill();
-      c.fillStyle='#31575c';c.font='9px Arial, sans-serif';c.fillText(`SNP ${indices[i]+1}`,cx,cy+10);
-      c.fillStyle='#72877f';c.font='8px Arial, sans-serif';c.fillText(`dot ${i+1}`,cx,cy+19);
+      c.fillStyle='#31575c';c.font='9px Arial, sans-serif';c.fillText(`SNP ${indices[i]+1}`,cx,cy+14);
       SharkCharacter.drawMarker(c,cx-10,cy+31,6,pairs[i],this.markerCache.palettes[i]);
       c.fillStyle='#173e46';c.font='bold 17px Arial, sans-serif';c.fillText(String(dose),cx+10,cy+37);
       c.font='9px Arial, sans-serif';c.fillText(['B/B','A/B','A/A'][dose],cx,cy+49);
     }
-    c.fillStyle='#72877f';c.font='9px Arial, sans-serif';c.fillText(`${indices.length} of ${state.p1.length} SNPs`,x,y+h-24);c.fillText(`Click the ${SeaLife.info(this.variant).singular} again to close this panel.`,x,y+h-10);c.restore();
+    const order=indices.length>5?`SNPs 1–5 left · 6–${indices.length} right · head → tail`:indices.length>1?`SNPs 1–${indices.length} · centreline · head → tail`:'SNP 1 · centreline';
+    c.fillStyle='#72877f';c.font='9px Arial, sans-serif';c.fillText(order,x,y+h-24);c.fillText(`Click the ${SeaLife.info(this.variant).singular} again to close this panel.`,x,y+h-10);c.restore();
   }
 
   draw(state){

@@ -21,10 +21,10 @@ test('headcounts are exact up to 200, then increase gently while preserving the 
 });
 
 test('each animal has one diploid dot per displayed SNP, capped at ten; fixed alleles and current frequencies are retained',()=>{
-  for(const ratio of [10,50,90])for(const loci of [1,5,8,10,32,100]){
+  for(const ratio of [10,50,90])for(const loci of [1,5,8,10,32,100,500]){
     const s={total:200,ratio,loci,m:0},sizes=M.sizes(s),d=D.summary(s),indices=D.markerIndices(loci);
     const animals=Array.from({length:d.total},(_,id)=>({id,side:id<d.west?0:1}));
-    assert.equal(indices.length,Math.min(10,loci));assert.equal(new Set(indices).size,indices.length);
+    assert.equal(indices.length,Math.min(10,loci));assert.equal(new Set(indices).size,indices.length);assert.deepEqual(Array.from(indices),Array.from({length:Math.min(10,loci)},(_,i)=>i));
     let pop=M.initial(s),r=M.rng(703);
     for(let i=0;i<8;i++)pop=M.advance(pop,s,r);
     pop.a[0]=0;pop.b[0]=1;

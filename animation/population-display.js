@@ -7,7 +7,7 @@ function summary(settings){
   const total=count(settings.total),west=Math.round(total*settings.ratio/100);
   return {total,west,east:total-west,weight:settings.total/total,exact:settings.total<=200};
 }
-function markerIndices(loci){const n=Math.min(10,loci);return Array.from({length:n},(_,i)=>n===1?0:Math.round(i*(loci-1)/(n-1)));}
+function markerIndices(loci){const n=Math.min(10,loci);return Array.from({length:n},(_,i)=>i);}
 // Single illustrative crossings. The rate is linear in m until a visual cap.
 function migrationRate(settings,generationsPerSecond){
   if(settings.m<=0||generationsPerSecond<=0)return 0;
