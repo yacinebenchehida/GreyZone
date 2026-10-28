@@ -25,3 +25,5 @@ header,main,footer{max-width:1520px}.intro{padding:32px 0 28px}h1{font-size:62px
 .allele-bar{background:#dce4db}.marker-rows>div>span{width:110px}
 
 .snp-colour-legend{display:flex;flex-wrap:wrap;gap:7px 17px;margin:0 20px 9px;font-size:10px;color:#506f70}.snp-colour-legend span{display:inline-flex;align-items:center;gap:6px}.snp-swatch{display:inline-block;width:12px;height:12px;border:1px solid #fff;border-radius:50%;box-shadow:0 0 0 1px #b8c6be}.snp-swatch.variable{background:#f4c98b}.snp-swatch.shared{background:#aab0b2}.snp-swatch.opposite{background:linear-gradient(90deg,#29d1be 50%,#f6a183 50%)}
+
+.fst-legend{display:flex;flex-wrap:wrap;gap:7px 16px;color:#698381;font-size:10px;margin:3px 0 7px}.fst-legend span{display:inline-flex;align-items:center;gap:5px}.fst-line-key{display:inline-block;width:16px;border-top:2px solid #26938d}.fst-range-key{display:inline-block;width:16px;height:8px;background:#26938d33}.fst-interval{font-size:10px;line-height:1.5;color:#698381;margin:0 0 10px}

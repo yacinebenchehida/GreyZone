@@ -43,8 +43,24 @@ function renderSnps(){
   }).join('')+'</tbody>';
 }
 function step(){pop=M.advance(pop,s,evolve);history.push({t:pop.generation,fst:M.fst(pop.a,pop.b)});if(history.length>2000)history=history.filter((_,i)=>i%2===0||i===history.length-1);if(worker)worker.postMessage({type:'advance',id:job,generation:pop.generation,population:pop,pauseAtTarget:paused});}
-function baseChart(maxX,maxY,label,opts={}){const w=340,h=145,l=35,r=329,t=16,b=115,x=v=>l+v/maxX*(r-l),y=v=>b-v/maxY*(b-t);let svg=`<svg viewBox="0 0 ${w} ${h}" aria-hidden="true">`;if(opts.greyEnd!==undefined)svg+=`<rect x="${l}" y="${t}" width="${x(Math.min(maxX,opts.greyEnd))-l}" height="${b-t}" fill="#e8e7de"/>`;for(let i=0;i<3;i++){const v=maxY*i/2;svg+=`<line x1="${l}" x2="${r}" y1="${y(v)}" y2="${y(v)}" stroke="#dfe7df"/><text x="${l-5}" y="${y(v)+3}" text-anchor="end" fill="#80918b" font-size="8">${opts.percent?Math.round(100*v)+'%':v.toFixed(maxY<.1?3:2)}</text>`;}for(let i=0;i<3;i++){const v=maxX*i/2;svg+=`<text x="${x(v)}" y="${b+13}" text-anchor="middle" fill="#80918b" font-size="8">${Math.round(v)}</text>`;}svg+=`<text x="${l}" y="10" font-size="8" fill="#698381">${label}</text><text x="${(l+r)/2}" y="142" text-anchor="middle" font-size="8" fill="#80918b">Generations since split</text>`;return {svg,x,y,l,r,t,b};}
-function plotFst(){const maxX=Math.max(10,Math.ceil(pop.generation/10)*10),maxY=1;let c=baseChart(maxX,maxY,'Hudson FST',{greyEnd:PowerResult.summary(power).status==='reached'?PowerResult.summary(power).generation:pop.generation});c.svg+=`<polyline points="${history.map(d=>c.x(d.t)+','+c.y(d.fst)).join(' ')}" fill="none" stroke="#26938d" stroke-width="2.4"/><circle cx="${c.x(pop.generation)}" cy="${c.y(history.at(-1).fst)}" r="3" fill="#1c7877"/></svg>`;$('fst-chart').innerHTML=c.svg;$('fst-chart').setAttribute('aria-label',`True differentiation at generation ${pop.generation}: FST ${history.at(-1).fst.toFixed(4)}`);}
+function baseChart(maxX,maxY,label,opts={}){const w=340,h=145,l=35,r=329,t=16,b=115,minY=opts.minY??0,x=v=>l+v/maxX*(r-l),y=v=>b-(v-minY)/(maxY-minY)*(b-t);let svg=`<svg viewBox="0 0 ${w} ${h}" aria-hidden="true">`;if(opts.greyEnd!==undefined)svg+=`<rect x="${l}" y="${t}" width="${x(Math.min(maxX,opts.greyEnd))-l}" height="${b-t}" fill="#e8e7de"/>`;for(let i=0;i<3;i++){const v=minY+(maxY-minY)*i/2;svg+=`<line x1="${l}" x2="${r}" y1="${y(v)}" y2="${y(v)}" stroke="#dfe7df"/><text x="${l-5}" y="${y(v)+3}" text-anchor="end" fill="#80918b" font-size="8">${opts.percent?Math.round(100*v)+'%':v.toFixed(maxY<.1?3:2)}</text>`;}for(let i=0;i<3;i++){const v=maxX*i/2;svg+=`<text x="${x(v)}" y="${b+13}" text-anchor="middle" fill="#80918b" font-size="8">${Math.round(v)}</text>`;}svg+=`<text x="${l}" y="10" font-size="8" fill="#698381">${label}</text><text x="${(l+r)/2}" y="142" text-anchor="middle" font-size="8" fill="#80918b">Generations since split</text>`;return {svg,x,y,l,r,t,b};}
+function plotFst(){
+  const maxX=Math.max(10,Math.ceil(pop.generation/10)*10);
+  const samples=(power?.points||[]).filter(p=>p.t<=pop.generation&&Number.isFinite(p.sampleFstLow)&&Number.isFinite(p.sampleFstHigh));
+  // Sampled Hudson estimates may be negative; retain the lower tail in the plot.
+  const lower=Math.min(0,...samples.map(p=>p.sampleFstLow)),minY=lower<0?Math.floor(lower*20)/20:0;
+  const result=PowerResult.summary(power),c=baseChart(maxX,1,'Hudson FST',{minY,greyEnd:result.status==='reached'?result.generation:pop.generation});
+  if(samples.length){
+    const upper=samples.map(p=>c.x(p.t)+','+c.y(p.sampleFstHigh));
+    const lower=[...samples].reverse().map(p=>c.x(p.t)+','+c.y(p.sampleFstLow));
+    c.svg+=`<polygon class="fst-sampling-band" points="${[...upper,...lower].join(' ')}" fill="#26938d" fill-opacity=".2"/>`;
+  }
+  c.svg+=`<polyline points="${history.map(d=>c.x(d.t)+','+c.y(d.fst)).join(' ')}" fill="none" stroke="#26938d" stroke-width="2.4"/><circle cx="${c.x(pop.generation)}" cy="${c.y(history.at(-1).fst)}" r="3" fill="#1c7877"/></svg>`;
+  $('fst-chart').innerHTML=c.svg;
+  const latest=samples.at(-1),range=latest?`95% sampled FST range at generation ${latest.t}: ${latest.sampleFstLow.toFixed(4)} to ${latest.sampleFstHigh.toFixed(4)}`:'The 95% sampled FST range appears after the first 500 study samples.';
+  $('fst-chart').setAttribute('aria-label',`True differentiation at generation ${pop.generation}: FST ${history.at(-1).fst.toFixed(4)}. ${range}`);
+  $('fst-interval').textContent=range;
+}
 function plotPower(){
   const points=power?.points||[],result=PowerResult.summary(power),max=Math.max(10,Math.ceil(pop.generation/10)*10);
   const crossing=result.status==='reached'?result.generation:null;
@@ -82,7 +98,7 @@ function showPowerResult(){
 function acceptPower(data){power=data;completedThrough=Math.max(completedThrough,data.max);progress=null;if(isFixed()){finished=true;running=false;paused=true;accumulator=0;stopClocks();if(worker)worker.postMessage({type:'pause',id:job});}sync();}
 function calculatePower(){
   stopWorker();power=null;pendingPower=null;progress=null;pendingProgress=null;completedThrough=-1;stepPowerTarget=null;const id=job;
-  try{worker=new Worker('power-worker.js?v=pause-clock-8');}catch(err){running=false;paused=true;sync();$('power-time').textContent='Power unavailable';return;}
+  try{worker=new Worker('power-worker.js?v=fst-range-9');}catch(err){running=false;paused=true;sync();$('power-time').textContent='Power unavailable';return;}
   worker.onmessage=event=>{
     const data=event.data;if(data.id!==job)return;
     if(data.type==='progress'){if(paused&&stepPowerTarget===null){pendingProgress=data;return;}progress=data;showPowerResult();return;}

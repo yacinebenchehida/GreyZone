@@ -173,3 +173,20 @@ test('pausing in a background tab cancels every timer and resumes with one clock
   a.click('play');assert.equal(a.pendingClocks().frames,1);
   a.tick(60);assert(Number(a.state().generation)>Number(paused.generation));
 });
+
+
+test('FST sampling band uses only completed live generations, shows negative estimates and freezes with either Pause control',()=>{
+  const a=app({total:20,autoPower:false});a.click('split');const w=a.workers[0],id=w.initialRequest.id;
+  assert(!a.element('fst-chart').innerHTML.includes('fst-sampling-band'));
+  const initial={t:0,power:.05,hits:25,sampleFstLow:-.03,sampleFstHigh:.08};
+  w.onmessage({data:{id,max:0,points:[initial]}});a.tick(30);
+  a.click('play');const frozen=a.element('fst-chart').innerHTML;
+  assert(frozen.includes('fst-sampling-band'));assert(frozen.includes('-0.05'));
+  const later={t:1,power:.2,hits:100,sampleFstLow:.01,sampleFstHigh:.2};
+  w.onmessage({data:{id,max:1,points:[initial,later]}});
+  assert.equal(a.element('fst-chart').innerHTML,frozen);
+  assert.match(a.element('fst-interval').textContent,/generation 0: -0.0300 to 0.0800/);
+  a.click('calculate-power');assert.match(a.element('fst-interval').textContent,/generation 1: 0.0100 to 0.2000/);
+  a.click('calculate-power');const paused=a.element('fst-chart').innerHTML;a.tick(120);assert.equal(a.element('fst-chart').innerHTML,paused);
+  assert(!paused.includes('NaN'));
+});

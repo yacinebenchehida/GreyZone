@@ -2,7 +2,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const M=require('../animation/model.js'),settings={total:2000,ratio:50,m:0,sample:40,loci:50};
 const context={Math};vm.createContext(context);vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation/power-result.js'),'utf8'),context);const P=context.PowerResult;
 function studies(seed,s,population,{clock=()=>0,autoDrain=true}={}){
-  const messages=[],tasks=[],world={Math,Number,performance:{now:clock},setTimeout(fn){tasks.push(fn);},importScripts(url){assert.equal(url,'model.js?v=live-studies-7');},postMessage(data){messages.push(JSON.parse(JSON.stringify(data)));}};
+  const messages=[],tasks=[],world={Math,Number,performance:{now:clock},setTimeout(fn){tasks.push(fn);},importScripts(url){assert.match(url,/^model\.js\?v=[a-z0-9-]+$/);},postMessage(data){messages.push(JSON.parse(JSON.stringify(data)));}};
   vm.createContext(world);vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation/model.js'),'utf8'),world);
   // The sampling worker must never initialise or evolve its own population.
   world.GreyModel.initial=()=>{throw Error('Independent population initialisation is forbidden');};
@@ -22,7 +22,7 @@ test('all 500 studies use the supplied live frequencies; the worker never runs a
   const s={...settings,loci:20},initial=M.initial(s),before=JSON.stringify(initial),run=studies(123,s,initial);
   let data=run.messages.at(-1);assert.equal(data.reps,500);assert.equal(data.max,0);assert.equal(data.points[0].populationFst,0);assert.equal(JSON.stringify(initial),before);
   const separated={a:Array(20).fill(1),b:Array(20).fill(0),generation:1};run.advance(separated);
-  data=run.messages.at(-1);assert.equal(data.points.at(-1).populationFst,1);assert.equal(data.points.at(-1).power,1);assert.equal(data.points.at(-1).sampleFstMean,1);
+  data=run.messages.at(-1);assert.equal(data.points.at(-1).populationFst,1);assert.equal(data.points.at(-1).power,1);assert.equal(data.points.at(-1).sampleFstMean,1);assert.equal(data.points.at(-1).sampleFstLow,1);assert.equal(data.points.at(-1).sampleFstHigh,1);
   const identical={a:Array(20).fill(.5),b:Array(20).fill(.5),generation:2};run.advance(identical);
   data=run.messages.at(-1);assert.equal(data.points.at(-1).populationFst,0);assert(data.points.at(-1).power<.12);assert.equal(data.first,1);
   for(const p of data.points)assert.equal(p.power,p.hits/500);
@@ -50,4 +50,18 @@ test('population input is copied and all selected SNPs are used even above the t
 test('generation-zero rejection remains near 5% across repeated study batches of identical populations',()=>{
   let hits=0;for(let seed=1;seed<=10;seed++)hits+=studies(seed,settings,M.initial(settings)).messages.at(-1).points[0].hits;
   assert(hits/5000>.03&&hits/5000<.07);
+});
+
+
+test('FST bounds are the 2.5th and 97.5th percentiles of the existing 500 samples, preserving negative estimates',()=>{
+  const seed=123,p=M.initial(settings),point=studies(seed,settings,p).messages.at(-1).points[0];
+  const observe=M.rng((seed>>>0)^0x49c1a72d),values=Array.from({length:500},()=>M.sample(p,settings,observe).fst).sort((a,b)=>a-b);
+  const percentile=q=>{const i=499*q,lo=Math.floor(i);return values[lo]*(1-(i-lo))+values[Math.ceil(i)]*(i-lo);};
+  assert(Math.abs(point.sampleFstLow-percentile(.025))<1e-14);
+  assert(Math.abs(point.sampleFstHigh-percentile(.975))<1e-14);
+  assert(point.sampleFstLow<0,'The negative sampling tail must remain visible');
+  assert.equal(point.hits,values.length*point.power);
+  const shared={a:Array(settings.loci).fill(0),b:Array(settings.loci).fill(0),generation:0};
+  const fixed=studies(seed,settings,shared).messages.at(-1).points[0];
+  assert.equal(fixed.sampleFstLow,0);assert.equal(fixed.sampleFstHigh,0);
 });

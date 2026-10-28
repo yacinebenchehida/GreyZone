@@ -6,6 +6,8 @@ Choose Ne, the split ratio, migration proportion m, individuals sampled per basi
 
 The first generation with at least 80% detection is the large central result. It remains visible afterwards. Reaching significance or 80% power never stops evolution.
 
+The FST plot includes a shaded 95% sampling range: the 2.5th and 97.5th percentiles of the sampled Hudson FST estimates from those same 500 studies, with linear interpolation between ordered values. The true population FST remains the solid line. This is a pointwise sampling range, not a confidence interval for the known population FST or an envelope across different histories. Negative sampled FST estimates are retained.
+
 The run continues until you pause it or every model SNP is in a stable fixed state. Without migration, both populations must be fixed at every locus. With migration, opposite fixation may be transient, so completion requires the same fixed allele on both sides at every locus. There is no generation cutoff. Completion is based on all numerical SNPs, including those beyond the ten shown on sharks. Run again creates a new history. Switching tabs does not pause the genetics; browsers can throttle background execution.
 
 Pause cancels the animation-frame loop and background timer, freezing generations, sharks, water and study sampling. Resume retains the same history and sampling RNG state. +1 generation leaves playback paused and calculates its 500 study samples. Both Pause buttons use the same controls. The clock waits for any unfinished study calculation before advancing, while the sharks keep swimming. Generation speed limits remain Slow 1.5, Normal 6 and Fast 25 gen/s; swimming speed is separate.

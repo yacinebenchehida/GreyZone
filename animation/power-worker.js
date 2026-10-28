@@ -1,5 +1,5 @@
 // Study resampling of the exact live population pair; no demographic simulation.
-importScripts('model.js?v=pause-clock-8');
+importScripts('model.js?v=fst-range-9');
 let batch=null;
 onmessage=function(event){
   const message=event.data;
@@ -19,7 +19,7 @@ function beginStudy(population,pauseAtTarget){
   if(!population||!Number.isInteger(population.generation)||population.generation<0||population.a?.length!==b.s.loci||population.b?.length!==b.s.loci)throw new Error('A complete live population is required for study resampling');
   if(population.generation<=(b.points.at(-1)?.t??-1))return;
   if(b.task)throw new Error('Finish the current generation before requesting another study');
-  b.task={population:{a:Array.from(population.a),b:Array.from(population.b),generation:population.generation},index:0,hits:0,fstSum:0,pauseAtTarget};
+  b.task={population:{a:Array.from(population.a),b:Array.from(population.b),generation:population.generation},index:0,hits:0,fstSum:0,fstSamples:[],pauseAtTarget};
   b.paused=false;reportProgress(true);schedule();
 }
 function reportProgress(force=false){
@@ -34,10 +34,11 @@ function work(){
   while(t.index<b.reps){
     const sample=M.sample(t.population,b.s,b.observe);
     if(sample.p<=.05)t.hits++;
-    t.fstSum+=sample.fst;t.index++;
+    t.fstSum+=sample.fst;t.fstSamples.push(sample.fst);t.index++;
     if(t.index<b.reps&&performance.now()-start>12){reportProgress();schedule();return;}
   }
-  const generation=t.population.generation,point={t:generation,power:t.hits/b.reps,hits:t.hits,populationFst:M.fst(t.population.a,t.population.b),sampleFstMean:t.fstSum/b.reps};
+  t.fstSamples.sort((a,b)=>a-b);
+  const generation=t.population.generation,point={t:generation,power:t.hits/b.reps,hits:t.hits,populationFst:M.fst(t.population.a,t.population.b),sampleFstMean:t.fstSum/b.reps,sampleFstLow:quantile(t.fstSamples,.025),sampleFstHigh:quantile(t.fstSamples,.975)};
   b.points.push(point);
   if(b.first===null&&generation>0&&point.power>=.8)b.first=generation;
   // Bound the display history while preserving the initial calibration and first crossing.
@@ -45,3 +46,6 @@ function work(){
   b.task=null;if(t.pauseAtTarget)b.paused=true;
   postMessage({id:b.id,seed:b.seed,reps:b.reps,generation,max:generation,points:b.points.map(p=>({...p})),first:b.first,nullRate:b.points[0].power,complete:false});
 }
+
+// Linear interpolation between adjacent ordered estimates (R default quantiles).
+function quantile(sorted,q){const index=(sorted.length-1)*q,lo=Math.floor(index),hi=Math.ceil(index);return sorted[lo]+(sorted[hi]-sorted[lo])*(index-lo);}
