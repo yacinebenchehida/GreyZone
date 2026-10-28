@@ -84,7 +84,11 @@ test('live power follows the clock, stays running after detection and reruns hav
   assert.equal(a.element('power-time').textContent,'Not reached yet');
   a.click('step');
   w.onmessage({data:{id,max:2,points:[{t:0,power:.05,hits:50},{t:1,power:.6,hits:600},{t:2,power:.85,hits:850}]}});
+  assert.equal(a.element('power-time').textContent,'Confirming…');assert.equal(a.element('power-unit').hidden,true);
+  const points=[{t:0,power:.05,hits:50},{t:1,power:.6,hits:600},{t:2,power:.85,hits:850}];
+  for(let t=3;t<=6;t++){a.click('step');points.push({t,power:.85,hits:850});w.onmessage({data:{id,max:t,points:points.slice()}});}
   assert.equal(a.element('power-time').textContent,'2');assert.equal(a.element('power-unit').hidden,false);assert.match(a.element('power-scene-time').textContent,/2 generations/);assert(!w.terminated);
+  assert.match(a.element('power-meaning').textContent,/generation 2 to 6/);
   const seed=a.workers[0].initialRequest.seed;a.click('split');assert.notEqual(a.workers[1].request.seed,seed);
 });
 test('the result-panel pause controls the live simulation, stale batches cannot update a rerun',()=>{
@@ -120,18 +124,17 @@ test('isolated 100-individual live history fixes the ten displayed SNPs and keep
 });
 
 
-test('Pause freezes queued power results and both charts; Resume applies them without changing the crossing number',()=>{
-  const a=app({total:100,autoPower:false});a.click('split');const w=a.workers[0],id=w.initialRequest.id;
-  w.onmessage({data:{id,max:0,reps:1000,points:[{t:0,power:.05,hits:50}]}});
-  a.tick(30);w.onmessage({data:{id,max:1,reps:1000,points:[{t:0,power:.05,hits:50},{t:1,power:.65,hits:650}]}});
-  a.tick(30);a.click('play');assert.equal(w.request.type,'pause');
+test('Pause freezes queued confirmation and both charts; Resume applies the confirmed start',()=>{
+  const a=app({total:100,autoPower:false});a.click('split');const w=a.workers[0],id=w.initialRequest.id,points=[{t:0,power:.05,hits:50}];
+  w.onmessage({data:{id,max:0,points:points.slice()}});
+  for(let t=1;t<=4;t++){a.click('step');points.push({t,power:.9,hits:900});w.onmessage({data:{id,max:t,points:points.slice()}});}
+  assert.equal(a.element('power-time').textContent,'Confirming…');assert.match(a.element('power-scene-time').textContent,/4\/5/);
+  a.click('play');a.tick(30);a.click('play');assert.equal(w.request.type,'pause');
   const before={title:a.element('power-time').textContent,curve:a.element('power-chart').innerHTML,now:a.element('power-now').textContent,fst:a.element('fst-chart').innerHTML};
-  w.onmessage({data:{id,max:2,points:[{t:0,power:.05,hits:50},{t:1,power:.65,hits:650},{t:2,power:.9,hits:900}]}});
-  a.tick(60);
+  points.push({t:5,power:.9,hits:900});w.onmessage({data:{id,max:5,points:points.slice()}});a.tick(60);
   assert.deepEqual({title:a.element('power-time').textContent,curve:a.element('power-chart').innerHTML,now:a.element('power-now').textContent,fst:a.element('fst-chart').innerHTML},before);
-  a.click('play');assert.equal(w.request.type,'resume');assert.equal(a.element('power-time').textContent,'2');
-  a.tick(30);a.click('calculate-power');assert.equal(w.request.type,'pause');
-  assert.equal(a.element('power-time').textContent,'2');assert.equal(a.element('power-unit').hidden,false);
+  a.click('play');assert.equal(w.request.type,'resume');assert.equal(a.element('power-time').textContent,'1');
+  a.tick(30);a.click('calculate-power');assert.equal(w.request.type,'pause');assert.equal(a.element('power-time').textContent,'1');assert.equal(a.element('power-unit').hidden,false);
   const paused=a.state();a.tick(60);assert.deepEqual(a.state(),paused);
 });
 
@@ -290,4 +293,17 @@ test('population bars name both alleles and show full state colours for fixed A 
   const source=fs.readFileSync(path.join(__dirname,'../animation/index.html'),'utf8');
   const panel=source.split('id="snp-panel"')[1].split('</article>')[0];
   assert(!panel.includes('genotype-key'));assert(!panel.includes('A/B'));assert(panel.includes('frequency-key'));
+});
+
+
+test('early stable fixation waits for a pending five-generation confirmation before stopping',()=>{
+  const a=app({total:20,loci:5,autoPower:false,advanceOverride:(p,s)=>({a:Array(s.loci).fill(0),b:Array(s.loci).fill(1),generation:p.generation+1})});
+  a.click('split');const w=a.workers[0],id=w.initialRequest.id,points=[{t:0,power:.05,hits:50}];
+  w.onmessage({data:{id,max:0,points:points.slice()}});
+  for(let t=1;t<=5;t++){
+    a.click('step');points.push({t,power:1,hits:1000});w.onmessage({data:{id,max:t,points:points.slice()}});
+    assert.equal(a.element('play').disabled,t===5);
+    assert.equal(a.element('power-time').textContent,t===5?'1':'Confirming…');
+  }
+  assert.equal(a.element('play').textContent,'Fixed');assert.match(a.element('power-meaning').textContent,/generation 1 to 5/);
 });

@@ -112,27 +112,31 @@ function plotPower(){
 function showPowerResult(){
   const result=PowerResult.summary(power),checked=power?.points?.at(-1),reached=hasRun&&result.status==='reached';
   $('power-time').className='power-time'+(hasRun&&!reached?' small':'');
-  $('power-unit').hidden=hasRun&&!reached;
+  $('power-unit').hidden=hasRun&&!reached;setText('power-unit',reached&&result.generation===1?'generation':'generations');
   let title,meaning,short,status;
   if(!hasRun){title='—';meaning='Choose Ne, m and your study design, then press Run simulation.';short='Not calculated';status='Run simulation to calculate';}
   else if(result.status==='uncalibrated'){title='Check study settings';meaning='The generation-0 false-positive rate is too high in this batch. This test cannot give a reliable grey-zone estimate.';short='Study calibration needs checking';status='No reliable generation estimate';}
   else if(reached){
-    title=number(result.generation);short=`${number(result.generation)} generations`;status='Grey zone overcome · 80% detection power reached';
-    meaning=`First checked generation with at least 80% detection power. This number stays visible as the simulation continues beyond it.`;
+    title=number(result.generation);short=`${number(result.generation)} ${result.generation===1?'generation':'generations'}`;status='Grey zone overcome · five consecutive generations at ≥80% power';
+    meaning=`Power stayed at or above 80% from generation ${number(result.generation)} to ${number(result.confirmedAt)}. The number shown is the first generation of that five-generation sequence.`;
+  }else if(result.status==='confirming'){
+    title='Confirming…';short=`Confirming · ${result.count}/5`;status=`At least 80% power · ${result.count} of 5 consecutive generations`;
+    meaning=`The current sequence started at generation ${number(result.generation)}. Five consecutive generations at or above 80% are required. A dip below 80% restarts the count.`;
   }else{
     title='Not reached yet';short='Not reached yet';status=`Live generation ${number(pop.generation)}`;
-    meaning=finished?'All SNPs are fixed. This history did not reach 80% detection power.':checked?`No generation has reached 80% detection power yet. Latest estimate: ${Math.round(100*checked.power)}% at generation ${number(checked.t)}.`:`Drawing ${number(s.studies)} study samples from the current populations. The generation number will appear here when detection power first reaches 80%.`;
+    meaning=finished?'All SNPs are fixed. This history did not complete five consecutive generations at ≥80% detection power.':checked?`No five-generation sequence at ≥80% power has been confirmed yet. Latest estimate: ${Math.round(100*checked.power)}% at generation ${number(checked.t)}.`:`Drawing ${number(s.studies)} study samples from the current populations. The generation number will appear here once power stays at or above 80% for five consecutive generations.`;
   }
   setText('power-time',title);setText('power-meaning',meaning);setText('power-scene-time',short);setText('power-status',status);
   if(!hasRun)valueLine('power-progress',['READY']);
   else valueLine('power-progress',['',finished?'FIXED':paused?(stepPowerTarget===null?'PAUSED':'STEPPING'):'RUNNING',' · generation ',number(pop.generation),' · ',number(s.studies),' study samples']);
-  setText('power-note',`${number(s.studies)} study samples of this live population pair · Generation playback waits for each power estimate. FST and genetics continue after the first 80% crossing.`);
+  setText('power-note',`${number(s.studies)} study samples of this live population pair · Generation playback waits for each power estimate. FST and genetics continue after the confirmed five-generation sequence.`);
   setText('calculate-power',finished?'Run again':hasRun?(paused?'Resume simulation':'Pause simulation'):'Run simulation');
 }
-function acceptPower(data){power=data;completedThrough=Math.max(completedThrough,data.max);progress=null;if(isFixed()){finished=true;running=false;paused=true;accumulator=0;stopClocks();if(worker)worker.postMessage({type:'pause',id:job});}sync();}
+// Stable fixation may need up to four further study generations to confirm a pending streak.
+function acceptPower(data){power=data;completedThrough=Math.max(completedThrough,data.max);progress=null;if(isFixed()&&PowerResult.summary(data).status!=='confirming'){finished=true;running=false;paused=true;accumulator=0;stopClocks();if(worker)worker.postMessage({type:'pause',id:job});}sync();}
 function calculatePower(){
   stopWorker();power=null;pendingPower=null;progress=null;pendingProgress=null;completedThrough=-1;stepPowerTarget=null;const id=job;
-  try{worker=new Worker('power-worker.js?v=steady-text-13');}catch(err){running=false;paused=true;sync();setText('power-time','Power unavailable');return;}
+  try{worker=new Worker('power-worker.js?v=five-generations-14');}catch(err){running=false;paused=true;sync();setText('power-time','Power unavailable');return;}
   worker.onmessage=event=>{
     const data=event.data;if(data.id!==job)return;
     if(data.type==='progress'){if(paused&&stepPowerTarget===null){pendingProgress=data;return;}progress=data;showPowerResult();return;}

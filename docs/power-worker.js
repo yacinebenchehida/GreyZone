@@ -1,12 +1,12 @@
 // Study resampling of the exact live population pair; no demographic simulation.
-importScripts('model.js?v=sea-life-12');
+importScripts('model.js?v=five-generations-14','power-result.js?v=five-generations-14');
 let batch=null;
 onmessage=function(event){
   const message=event.data;
   if(message.type==='init'){
     batch={s:message.settings,id:message.id,seed:message.seed,reps:1000,
       observe:GreyModel.rng((Number(message.seed)>>>0)^0x49c1a72d),
-      points:[],first:null,task:null,scheduled:false,paused:false,lastProgress:0};
+      points:[],detection:PowerResult.tracker(),task:null,scheduled:false,paused:false,lastProgress:0};
     beginStudy(message.population,false);
   }else if(batch&&message.id===batch.id){
     if(message.type==='advance')beginStudy(message.population,Boolean(message.pauseAtTarget));
@@ -40,11 +40,11 @@ function work(){
   t.fstSamples.sort((a,b)=>a-b);
   const generation=t.population.generation,point={t:generation,power:t.hits/b.reps,hits:t.hits,populationFst:M.fst(t.population.a,t.population.b),sampleFstMean:t.fstSum/b.reps,sampleFstLow:quantile(t.fstSamples,.025),sampleFstHigh:quantile(t.fstSamples,.975)};
   b.points.push(point);
-  if(b.first===null&&generation>0&&point.power>=.8)b.first=generation;
-  // Bound the display history while preserving the initial calibration and first crossing.
-  if(b.points.length>2000)b.points=b.points.filter((p,i)=>i%2===0||p.t===b.first||i===b.points.length-1);
+  PowerResult.record(b.detection,point);
+  // Track the full sequence before thinning; keep the confirmed five-point run.
+  if(b.points.length>2000)b.points=b.points.filter((p,i)=>i%2===0||p.t>=generation-4||(b.detection.first!==null&&p.t>=b.detection.first&&p.t<=b.detection.confirmedAt));
   b.task=null;if(t.pauseAtTarget)b.paused=true;
-  postMessage({id:b.id,seed:b.seed,reps:b.reps,generation,max:generation,points:b.points.map(p=>({...p})),first:b.first,nullRate:b.points[0].power,complete:false});
+  postMessage({id:b.id,seed:b.seed,reps:b.reps,generation,max:generation,points:b.points.map(p=>({...p})),first:b.detection.first,detection:{...b.detection},nullRate:b.points[0].power,complete:false});
 }
 
 // Linear interpolation between adjacent ordered estimates (R default quantiles).

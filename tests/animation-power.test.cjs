@@ -2,7 +2,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const M=require('../animation/model.js'),settings={total:2000,ratio:50,m:0,sample:40,loci:50};
 const context={Math};vm.createContext(context);vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation/power-result.js'),'utf8'),context);const P=context.PowerResult;
 function studies(seed,s,population,{clock=()=>0,autoDrain=true}={}){
-  const messages=[],tasks=[],world={Math,Number,performance:{now:clock},setTimeout(fn){tasks.push(fn);},importScripts(url){assert.match(url,/^model\.js\?v=[a-z0-9-]+$/);},postMessage(data){messages.push(JSON.parse(JSON.stringify(data)));}};
+  const messages=[],tasks=[],world={Math,Number,performance:{now:clock},setTimeout(fn){tasks.push(fn);},importScripts(...urls){for(const url of urls){assert.match(url,/^(model|power-result)\.js\?v=[a-z0-9-]+$/);if(url.startsWith('power-result'))vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation/power-result.js'),'utf8'),world);}},postMessage(data){messages.push(JSON.parse(JSON.stringify(data)));}};
   vm.createContext(world);vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation/model.js'),'utf8'),world);
   // The sampling worker must never initialise or evolve its own population.
   world.GreyModel.initial=()=>{throw Error('Independent population initialisation is forbidden');};
@@ -13,10 +13,30 @@ function studies(seed,s,population,{clock=()=>0,autoDrain=true}={}){
   send({type:'init',settings:s,population,seed});if(autoDrain)drain();
   return {messages,send,drain,runOne(){tasks.shift()?.();},advance(pop,pauseAtTarget=false){send({type:'advance',population:pop,pauseAtTarget});drain();}};
 }
-test('status remembers the first live-history crossing, flags poor null calibration and never extrapolates',()=>{
+test('five consecutive generations confirm the start, short spikes reset, equality counts and later dips retain the exit',()=>{
   const points=[{t:0,power:.05},{t:1,power:.85},{t:2,power:.65},{t:3,power:.9}];
-  assert.equal(P.summary({points}).generation,1);assert.equal(P.at(points,2),.65);assert.equal(P.at(points,4),null);
+  assert.equal(P.summary({points}).status,'confirming');assert.equal(P.summary({points}).count,1);
+  for(let t=4;t<=6;t++)points.push({t,power:.8});
+  assert.equal(P.summary({points}).status,'confirming');assert.equal(P.summary({points}).count,4);
+  points.push({t:7,power:.79});assert.equal(P.summary({points}).status,'not-yet');
+  for(let t=8;t<=12;t++)points.push({t,power:.8});
+  assert.equal(P.summary({points}).generation,8);assert.equal(P.summary({points}).confirmedAt,12);
+  points.push({t:13,power:.1});assert.equal(P.summary({points}).generation,8);
+  assert.equal(P.at(points,2),.65);assert.equal(P.at(points,20),null);
   assert.equal(P.summary({points:[{t:0,power:.2}]}).status,'uncalibrated');
+  assert.equal(P.summary({points:[{t:0,power:.05},...[1,3,5,7,9].map(t=>({t,power:1}))]}).status,'confirming');
+  assert.equal(P.summary({points:[{t:0,power:.05},...[1,3,5,7,9].map(t=>({t,power:1}))]}).count,1);
+});
+test('full-generation tracker survives thinned charts and never counts generation zero or duplicate estimates',()=>{
+  const state=P.tracker();P.record(state,{t:0,power:1});assert.equal(state.streak,0);
+  P.record(state,{t:1,power:.9});P.record(state,{t:1,power:.9});assert.equal(state.streak,1);
+  P.record(state,{t:2,power:.5});
+  for(let t=3;t<=2004;t++)P.record(state,{t,power:t>=2001?.8:.5});
+  const points=[{t:0,power:.05},{t:2004,power:.8}];
+  assert.equal(P.summary({points,detection:state}).count,4);
+  P.record(state,{t:2005,power:.8});points.push({t:2005,power:.8});
+  assert.equal(P.summary({points,detection:state}).generation,2001);
+  P.record(state,{t:2006,power:0});assert.equal(P.summary({points,detection:state}).generation,2001);
 });
 test('all 1000 studies use the supplied live frequencies; the worker never runs another population history',()=>{
   const s={...settings,loci:20},initial=M.initial(s),before=JSON.stringify(initial),run=studies(123,s,initial);
@@ -24,7 +44,7 @@ test('all 1000 studies use the supplied live frequencies; the worker never runs 
   const separated={a:Array(20).fill(1),b:Array(20).fill(0),generation:1};run.advance(separated);
   data=run.messages.at(-1);assert.equal(data.points.at(-1).populationFst,1);assert.equal(data.points.at(-1).power,1);assert.equal(data.points.at(-1).sampleFstMean,1);assert.equal(data.points.at(-1).sampleFstLow,1);assert.equal(data.points.at(-1).sampleFstHigh,1);
   const identical={a:Array(20).fill(.5),b:Array(20).fill(.5),generation:2};run.advance(identical);
-  data=run.messages.at(-1);assert.equal(data.points.at(-1).populationFst,0);assert(data.points.at(-1).power<.12);assert.equal(data.first,1);
+  data=run.messages.at(-1);assert.equal(data.points.at(-1).populationFst,0);assert(data.points.at(-1).power<.12);assert.equal(data.first,null);assert.equal(data.detection.streak,0);
   for(const p of data.points)assert.equal(p.power,p.hits/1000);
   const length=run.messages.length;run.advance(identical);assert.equal(run.messages.length,length);
 });
@@ -64,4 +84,16 @@ test('FST bounds are the 2.5th and 97.5th percentiles of the existing 1000 sampl
   const shared={a:Array(settings.loci).fill(0),b:Array(settings.loci).fill(0),generation:0};
   const fixed=studies(seed,settings,shared).messages.at(-1).points[0];
   assert.equal(fixed.sampleFstLow,0);assert.equal(fixed.sampleFstHigh,0);
+});
+
+
+test('worker confirms only the fifth consecutive estimate and preserves its start after later power falls',()=>{
+  const s={...settings,loci:5},run=studies(123,s,M.initial(s));
+  const split=generation=>({a:Array(5).fill(1),b:Array(5).fill(0),generation});
+  const same=generation=>({a:Array(5).fill(0),b:Array(5).fill(0),generation});
+  for(let t=1;t<=4;t++){run.advance(split(t));assert.equal(run.messages.at(-1).first,null);assert.equal(P.summary(run.messages.at(-1)).count,t);}
+  run.advance(same(5));assert.equal(P.summary(run.messages.at(-1)).status,'not-yet');
+  for(let t=6;t<=10;t++)run.advance(split(t));
+  let data=run.messages.at(-1);assert.equal(data.first,6);assert.equal(data.detection.confirmedAt,10);assert.equal(P.summary(data).generation,6);
+  run.advance(same(11));data=run.messages.at(-1);assert.equal(data.first,6);assert.equal(P.summary(data).generation,6);
 });
