@@ -1,7 +1,7 @@
 (function(){
 'use strict';
 const M=GreyModel,$=id=>document.getElementById(id),canvas=$('scene'),ocean=new OceanScene(canvas);
-let s,pop,evolve,observe,split=false,running=false,paused=false,history=[],power=null,pendingPower=null,progress=null,pendingProgress=null,completedThrough=-1,stepPowerTarget=null,worker=null,job=0,sampleResults=[],lastSampleGen=-1,last=0,accumulator=0,hasRun=false,runSeed=0,seedCounter=0,finished=false,backgroundTimer=null,animationFrame=null;
+let s,pop,evolve,observe,split=false,running=false,paused=false,history=[],power=null,pendingPower=null,progress=null,pendingProgress=null,completedThrough=-1,stepPowerTarget=null,worker=null,job=0,sampleResults=[],lastSampleGen=-1,last=0,accumulator=0,hasRun=false,runSeed=0,seedCounter=0,finished=false,backgroundTimer=null,animationFrame=null,snpDisplayPop=null,snpDisplayFilter=null;
 function settings(){return {total:+$('total').value,ratio:+$('ratio').value,m:+$('migration').value,sample:+$('sample-size').value,loci:+$('loci').value,studies:1000};}
 function number(x){return x.toLocaleString('en-GB');}
 function isFixed(){const state=GreyDisplay.sorting([pop.a,pop.b]);return state.fixed===s.loci&&(s.m===0||state.opposite===0);}
@@ -34,14 +34,26 @@ function reset(){
   $('sample-result').innerHTML='<span class="sample-icon">?</span><strong>What would your study find?</strong><p>The barrier can be real even when the genetic test misses it.</p>';$('sample-history').textContent='';sync();scheduleFrame();
 }
 function startRun(){reset();hasRun=true;split=true;running=true;paused=false;$('split').textContent='Run again';$('take-sample').disabled=false;sync();calculatePower();}
-function sync(){const g=pop.generation;$('generation').textContent=number(g);$('play').disabled=!split||finished;$('step').disabled=!split||finished||completedThrough<g;$('play').textContent=finished?'Fixed':running?'Pause':'Resume';$('play').setAttribute('aria-pressed',String(paused));$('calculate-power').setAttribute('aria-pressed',String(paused));$('phase').textContent=split?(s.m?'Two seas. A connecting channel.':'Two seas. Complete isolation.'):'One sea. One population.';$('barrier-label').hidden=!split;$('channel-label').hidden=!split||!s.m;$('fst-value').textContent='FST '+M.fst(pop.a,pop.b).toFixed(4);for(const [name,p] of [['west',pop.a[0]],['east',pop.b[0]]]){$(name+'-bead').style.width=100*p+'%';$(name+'-share').textContent=Math.round(100*p)+'%';}if(!split)$('story').textContent='Choose Ne, m and your study design, then press Run simulation.';else if(!g)$('story').textContent='The split has started. Both populations begin with identical allele frequencies.';else $('story').textContent=s.m?`Generation ${g}: drift pulls the populations apart; migrants reconnect their gene pools.`:`Generation ${g}: no individuals cross. A genetic study may still miss the separation.`;if(finished)$('story').textContent=`All ${s.loci} SNPs are fixed at generation ${number(g)}. Run again for a new history.`;const sorted=GreyDisplay.sorting([pop.a,pop.b]);$('sorting-status').textContent=`Fixed on both sides: ${sorted.fixed}/${sorted.total} SNPs · opposite fixed alleles: ${sorted.opposite}/${sorted.total}. Significance does not freeze allele frequencies.`;renderSnps();plotFst();plotPower();}
+function sync(){const g=pop.generation;$('generation').textContent=number(g);$('play').disabled=!split||finished;$('step').disabled=!split||finished||completedThrough<g;$('play').textContent=finished?'Fixed':running?'Pause':'Resume';$('play').setAttribute('aria-pressed',String(paused));$('calculate-power').setAttribute('aria-pressed',String(paused));$('phase').textContent=split?(s.m?'Two seas. A connecting channel.':'Two seas. Complete isolation.'):'One sea. One population.';$('barrier-label').hidden=!split;$('channel-label').hidden=!split||!s.m;$('fst-value').textContent='FST '+M.fst(pop.a,pop.b).toFixed(4);if(!split)$('story').textContent='Choose Ne, m and your study design, then press Run simulation.';else if(!g)$('story').textContent='The split has started. Both populations begin with identical allele frequencies.';else $('story').textContent=s.m?`Generation ${g}: drift pulls the populations apart; migrants reconnect their gene pools.`:`Generation ${g}: no individuals cross. A genetic study may still miss the separation.`;if(finished)$('story').textContent=`All ${s.loci} SNPs are fixed at generation ${number(g)}. Run again for a new history.`;const sorted=GreyDisplay.sorting([pop.a,pop.b]);$('sorting-status').textContent=`${sorted.total-sorted.fixed}/${sorted.total} segregating · ${sorted.fixed-sorted.opposite}/${sorted.total} fixed identically · ${sorted.opposite}/${sorted.total} fixed differently.`;renderSnps();plotFst();plotPower();}
 function renderSnps(){
-  const indices=GreyDisplay.markerIndices(s.loci);
-  $('snp-frequencies').innerHTML='<thead><tr><th>SNP</th><th>West allele A</th><th>East allele A</th><th>State</th></tr></thead><tbody>'+indices.map((l,i)=>{
-    const a=pop.a[l],b=pop.b[l],fixed=(a===0||a===1)&&(b===0||b===1);
-    return `<tr><td>${l+1} · dot ${i+1}</td><td>${(100*a).toFixed(1)}%</td><td>${(100*b).toFixed(1)}%</td><td>${fixed?(a===b?'Fixed · same':'Fixed · opposite'):'Segregating'}</td></tr>`;
-  }).join('')+'</tbody>';
+  const onlyVariable=$('segregating-only').checked;
+  if(snpDisplayPop===pop&&snpDisplayFilter===onlyVariable)return;
+  snpDisplayPop=pop;snpDisplayFilter=onlyVariable;
+  const dots=new Map(GreyDisplay.markerIndices(s.loci).map((l,i)=>[l,i+1]));
+  const labels={'segregating':'Segregating','shared-fixed':'Fixed identically','opposite-fixed':'Fixed differently'};
+  let shown=0;const cards=[];
+  for(let l=0;l<s.loci;l++){
+    const a=pop.a[l],b=pop.b[l],state=GreyDisplay.locusState(a,b);
+    if(onlyVariable&&state!=='segregating')continue;
+    shown++;
+    const bar=(side,p)=>`<div class="snp-frequency-row"><span>${side}</span><div class="snp-frequency-bar" role="meter" aria-label="SNP ${l+1}, ${side}, allele A frequency" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${100*p}" aria-valuetext="${GreyDisplay.allelePercent(p)}"><i style="width:${100*p}%"></i></div><b title="Allele A frequency: ${p}">${GreyDisplay.allelePercent(p)}</b></div>`;
+    cards.push(`<article class="snp-card ${state}" data-locus="${l+1}"><div class="snp-card-heading"><strong>SNP ${l+1}</strong>${dots.has(l)?`<span class="snp-dot-badge">dot ${dots.get(l)}</span>`:''}</div><p class="snp-state">${labels[state]}</p>${bar('West',a)}${bar('East',b)}</article>`);
+  }
+  $('snp-frequencies').innerHTML=cards.join('');
+  $('snp-empty').hidden=shown>0;
+  $('snp-list-count').textContent=`${number(shown)} of ${number(s.loci)} SNPs shown · allele A frequencies`;
 }
+
 function step(){pop=M.advance(pop,s,evolve);history.push({t:pop.generation,fst:M.fst(pop.a,pop.b)});if(history.length>2000)history=history.filter((_,i)=>i%2===0||i===history.length-1);if(worker)worker.postMessage({type:'advance',id:job,generation:pop.generation,population:pop,pauseAtTarget:paused});}
 function baseChart(maxX,maxY,label,opts={}){const w=340,h=145,l=35,r=329,t=16,b=115,minY=opts.minY??0,x=v=>l+v/maxX*(r-l),y=v=>b-(v-minY)/(maxY-minY)*(b-t);let svg=`<svg viewBox="0 0 ${w} ${h}" aria-hidden="true">`;if(opts.greyEnd!==undefined)svg+=`<rect x="${l}" y="${t}" width="${x(Math.min(maxX,opts.greyEnd))-l}" height="${b-t}" fill="#e8e7de"/>`;for(let i=0;i<3;i++){const v=minY+(maxY-minY)*i/2;svg+=`<line x1="${l}" x2="${r}" y1="${y(v)}" y2="${y(v)}" stroke="#dfe7df"/><text x="${l-5}" y="${y(v)+3}" text-anchor="end" fill="#80918b" font-size="8">${opts.percent?Math.round(100*v)+'%':v.toFixed(maxY<.1?3:2)}</text>`;}for(let i=0;i<3;i++){const v=maxX*i/2;svg+=`<text x="${x(v)}" y="${b+13}" text-anchor="middle" fill="#80918b" font-size="8">${Math.round(v)}</text>`;}svg+=`<text x="${l}" y="10" font-size="8" fill="#698381">${label}</text><text x="${(l+r)/2}" y="142" text-anchor="middle" font-size="8" fill="#80918b">Generations since split</text>`;return {svg,x,y,l,r,t,b};}
 function plotFst(){
@@ -98,7 +110,7 @@ function showPowerResult(){
 function acceptPower(data){power=data;completedThrough=Math.max(completedThrough,data.max);progress=null;if(isFixed()){finished=true;running=false;paused=true;accumulator=0;stopClocks();if(worker)worker.postMessage({type:'pause',id:job});}sync();}
 function calculatePower(){
   stopWorker();power=null;pendingPower=null;progress=null;pendingProgress=null;completedThrough=-1;stepPowerTarget=null;const id=job;
-  try{worker=new Worker('power-worker.js?v=thousand-studies-10');}catch(err){running=false;paused=true;sync();$('power-time').textContent='Power unavailable';return;}
+  try{worker=new Worker('power-worker.js?v=snp-explorer-11');}catch(err){running=false;paused=true;sync();$('power-time').textContent='Power unavailable';return;}
   worker.onmessage=event=>{
     const data=event.data;if(data.id!==job)return;
     if(data.type==='progress'){if(paused&&stepPowerTarget===null){pendingProgress=data;return;}progress=data;showPowerResult();return;}
@@ -143,5 +155,5 @@ function frame(now){animationFrame=null;if(document.hidden||paused)return;advanc
 function backgroundTick(){backgroundTimer=null;if(document.hidden&&running){advanceClock(performance.now());ensureBackgroundClock();}}
 function ensureBackgroundClock(){if(document.hidden&&running&&backgroundTimer===null)backgroundTimer=setTimeout(backgroundTick,100);}
 
-$('shark-design').onchange=()=>{ocean.variant=$('shark-design').value;drawScene();};$('travel-speed').onchange=()=>{ocean.travelPace=Number($('travel-speed').value);};$('show-markers').onchange=drawScene;ocean.onInspect=()=>{if(paused)drawScene();};$('meet-shark').onclick=()=>{ocean.selected=ocean.selected<0?1:-1;drawScene();};$('split').onclick=startRun;$('play').onclick=togglePlayback;$('step').onclick=singleStep;$('reset').onclick=reset;$('take-sample').onclick=takeSample;$('calculate-power').onclick=togglePower;for(const id of ['total','ratio','migration','sample-size','loci'])$(id).addEventListener('change',reset);$('ratio').addEventListener('input',()=>$('ratio-out').textContent=$('ratio').value+'%');$('sample-size').addEventListener('input',()=>$('sample-out').textContent=$('sample-size').value);document.addEventListener('visibilitychange',()=>{stopClocks();scheduleFrame();ensureBackgroundClock();});new ResizeObserver(resize).observe(canvas);reset();resize();
+$('shark-design').onchange=()=>{ocean.variant=$('shark-design').value;drawScene();};$('travel-speed').onchange=()=>{ocean.travelPace=Number($('travel-speed').value);};$('segregating-only').onchange=renderSnps;$('show-markers').onchange=drawScene;ocean.onInspect=()=>{if(paused)drawScene();};$('meet-shark').onclick=()=>{ocean.selected=ocean.selected<0?1:-1;drawScene();};$('split').onclick=startRun;$('play').onclick=togglePlayback;$('step').onclick=singleStep;$('reset').onclick=reset;$('take-sample').onclick=takeSample;$('calculate-power').onclick=togglePower;for(const id of ['total','ratio','migration','sample-size','loci'])$(id).addEventListener('change',reset);$('ratio').addEventListener('input',()=>$('ratio-out').textContent=$('ratio').value+'%');$('sample-size').addEventListener('input',()=>$('sample-out').textContent=$('sample-size').value);document.addEventListener('visibilitychange',()=>{stopClocks();scheduleFrame();ensureBackgroundClock();});new ResizeObserver(resize).observe(canvas);reset();resize();
 })();

@@ -1,5 +1,5 @@
 // Study resampling of the exact live population pair; no demographic simulation.
-importScripts('model.js?v=thousand-studies-10');
+importScripts('model.js?v=snp-explorer-11');
 let batch=null;
 onmessage=function(event){
   const message=event.data;

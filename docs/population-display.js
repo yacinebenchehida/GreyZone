@@ -13,6 +13,14 @@ function migrationRate(settings,generationsPerSecond){
   if(settings.m<=0||generationsPerSecond<=0)return 0;
   return Math.min(.65,settings.m*count(settings.total)*generationsPerSecond*.25);
 }
+function dosage(pair){return Number(pair[0])+Number(pair[1]);}
+function locusState(a,b){return (a===0||a===1)&&(b===0||b===1)?(a===b?'shared-fixed':'opposite-fixed'):'segregating';}
+function allelePercent(p){
+  if(p===0)return '0%';if(p===1)return '100%';
+  const value=100*p;
+  if(value<.01)return '<0.01%';if(value>99.99)return '>99.99%';
+  return value.toFixed(2).replace(/\.?0+$/,'')+'%';
+}
 function sorting(frequencies){
   let fixed=0,opposite=0;
   for(let i=0;i<frequencies[0].length;i++){
@@ -26,9 +34,9 @@ function sorting(frequencies){
 function markerPalettes(frequencies,indices){
   return indices.map(locus=>{
     const west=frequencies[0][locus],east=frequencies[1][locus];
-    const bothFixed=(west===0||west===1)&&(east===0||east===1);
-    if(!bothFixed)return {state:'segregating',sharedFixed:false,colors:['#f4c98b','#f4c98b']};
-    if(west===east)return {state:'shared-fixed',sharedFixed:true,colors:['#aab0b2','#aab0b2']};
+    const state=locusState(west,east);
+    if(state==='segregating')return {state:'segregating',sharedFixed:false,colors:['#f4c98b','#f4c98b']};
+    if(state==='shared-fixed')return {state:'shared-fixed',sharedFixed:true,colors:['#aab0b2','#aab0b2']};
     return {state:'opposite-fixed',westAllele:Boolean(west),sharedFixed:false,colors:west===1?['#f6a183','#29d1be']:['#29d1be','#f6a183']};
   });
 }
@@ -52,5 +60,5 @@ function markers(animals,frequencies,indices,seed=0){
   }
   return result;
 }
-root.GreyDisplay={count,summary,markerIndices,migrationRate,markers,markerPalettes,sorting};
+root.GreyDisplay={count,summary,markerIndices,migrationRate,markers,markerPalettes,sorting,dosage,locusState,allelePercent};
 })(globalThis);

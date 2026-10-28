@@ -104,7 +104,7 @@ test('isolated 100-individual live history fixes the ten displayed SNPs and keep
   for(let i=0;i<1600&&!a.element('step').disabled;i++)a.click('step');
   a.scene.draw=draw;
   a.element('show-markers').checked=true;a.element('show-markers').onchange();a.tick();
-  assert.match(a.element('sorting-status').textContent,/Fixed on both sides: 50\/50/);
+  assert.match(a.element('sorting-status').textContent,/0\/50 segregating/);
   assert.equal(a.element('fst-value').textContent,'FST 1.0000');assert.equal(a.element('play').textContent,'Fixed');assert(a.element('play').disabled);
   const fixed=a.state();a.tick(60);assert.deepEqual(a.state(),fixed);
   const cache=a.scene.markerCache;
@@ -189,4 +189,38 @@ test('FST sampling band uses only completed live generations, shows negative est
   a.click('calculate-power');assert.match(a.element('fst-interval').textContent,/generation 1: 0.0100 to 0.2000/);
   a.click('calculate-power');const paused=a.element('fst-chart').innerHTML;a.tick(120);assert.equal(a.element('fst-chart').innerHTML,paused);
   assert(!paused.includes('NaN'));
+});
+
+
+test('all 500 SNPs have paired frequency bars, ten dot badges, and an optional segregating-only filter',()=>{
+  const a=app({total:100,loci:500,advanceOverride:(p,s)=>{
+    const a=Array(s.loci).fill(1),b=Array(s.loci).fill(1);
+    a[0]=0;b[0]=1;a[499]=.999999;b[499]=.5;
+    return {a,b,generation:p.generation+1};
+  }});
+  assert.equal((a.element('snp-frequencies').innerHTML.match(/class="snp-card /g)||[]).length,500);
+  assert.equal((a.element('snp-frequencies').innerHTML.match(/class="snp-dot-badge"/g)||[]).length,10);
+  a.click('split');a.click('step');const html=a.element('snp-frequencies').innerHTML;
+  assert(html.includes('SNP 500'));assert(html.includes('>99.99%'));
+  assert.equal((html.match(/role="meter"/g)||[]).length,1000);
+  assert.match(a.element('sorting-status').textContent,/1\/500 segregating/);
+  a.element('segregating-only').checked=true;a.element('segregating-only').onchange();
+  const filtered=a.element('snp-frequencies').innerHTML;
+  assert.equal((filtered.match(/class="snp-card /g)||[]).length,1);
+  assert(filtered.includes('SNP 500'));assert(filtered.includes('dot 10'));
+  assert.match(a.element('snp-list-count').textContent,/1 of 500 SNPs shown/);
+  a.element('segregating-only').checked=false;a.element('segregating-only').onchange();
+  assert.equal((a.element('snp-frequencies').innerHTML.match(/class="snp-card /g)||[]).length,500);
+});
+
+test('a paused close-up shows allele-A genotype dosages even when the overview dots are hidden',()=>{
+  const a=app({total:20,loci:5});a.click('split');a.click('play');
+  const labels=[];a.scene.c.fillText=(text)=>labels.push(text);
+  assert.equal(a.element('show-markers').checked,false);const before=a.state();
+  a.click('meet-shark');assert(a.scene.markerCache);
+  assert(labels.includes('Genotype = 0, 1 or 2 copies of allele A'));
+  assert(labels.includes('SNP 1')&&labels.includes('SNP 5'));
+  assert(labels.some(x=>['0','1','2'].includes(x)));
+  assert(labels.some(x=>['B/B','A/B','A/A'].includes(x)));
+  a.tick(120);assert.deepEqual(a.state(),before);
 });

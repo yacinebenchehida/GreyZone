@@ -32,6 +32,24 @@ function makeSpine(animal){
   function at(u,r){const p=basis(u);return{x:p.x-Math.sin(p.a)*r,y:p.y+Math.cos(p.a)*r};}
   return {spine,basis,at};
 }
+function drawMarker(c,x,y,r,pair,palette){
+  const colors=palette?.colors||['#f6a183','#29d1be'];
+  const dose=Number(pair[0])+Number(pair[1]);
+  if(palette?.state==='segregating'){
+    if(dose){
+      c.fillStyle=colors[0];c.beginPath();
+      if(dose===1){c.moveTo(x,y);c.arc(x,y,r,-Math.PI/2,Math.PI/2);c.closePath();}
+      else c.arc(x,y,r,0,TAU);
+      c.fill();
+    }
+    c.strokeStyle=colors[0];c.lineWidth=1.5;c.beginPath();c.arc(x,y,r,0,TAU);c.stroke();
+  }else if(pair[0]===pair[1]){
+    c.fillStyle=colors[Number(pair[0])];c.beginPath();c.arc(x,y,r,0,TAU);c.fill();
+  }else for(let copy=0;copy<2;copy++){
+    c.fillStyle=colors[Number(pair[copy])];c.beginPath();c.moveTo(x,y);c.arc(x,y,r,copy?0:Math.PI,copy?Math.PI:TAU);c.closePath();c.fill();
+  }
+  c.strokeStyle='#f6fff5';c.lineWidth=.7;c.beginPath();c.arc(x,y,r+.65,0,TAU);c.stroke();
+}
 function draw(c,animal,time=0,options={}){
   const style=profiles[options.variant||animal.variant||'classic'],phase=animal.stroke||0;
   const {spine,basis,at}=makeSpine(animal);
@@ -59,21 +77,13 @@ function draw(c,animal,time=0,options={}){
   c.save();contour(c,body);c.clip();
   for(const side of [-1,1]){c.beginPath();for(let i=0;i<50;i++){const u=.08+i/49*.81,ix=u*(half.length-1),lo=Math.floor(ix),r=(half[lo]+(half[Math.min(lo+1,half.length-1)]-half[lo])*(ix-lo))*style.width*.92,p=at(u,side*r);i?c.lineTo(p.x,p.y):c.moveTo(p.x,p.y);}c.strokeStyle='#eeeeee40';c.lineWidth=.8;c.stroke();}
   c.restore();
-  // Each SNP is one small split-colour dot: one half per diploid gene copy.
-  // All dots move with the same body spine; the display is capped at ten SNPs.
+  // Gold marker fill encodes allele-A dosage; fixed loci retain their state colour.
   if(options.snps){
     const n=Math.min(10,options.snps.length);
     for(let i=0;i<n;i++){
       const rows=n>5,columns=rows?5:n,col=rows?i%5:i,row=rows?Math.floor(i/5):0;
-      const p=at(columns===1?.43:.24+col/(columns-1)*.37,rows?(row?5.6:-5.6):0),r=4.4,pair=options.snps[i],colors=options.snpPalettes?.[i]?.colors||['#f6a183','#29d1be'];
-      if(pair[0]===pair[1]){
-        c.fillStyle=colors[Number(pair[0])];c.beginPath();c.arc(p.x,p.y,r,0,TAU);c.fill();
-      }else for(let copy=0;copy<2;copy++){
-        c.fillStyle=colors[Number(pair[copy])];c.beginPath();c.moveTo(p.x,p.y);c.arc(p.x,p.y,r,copy?0:Math.PI,copy?Math.PI:TAU);c.closePath();c.fill();
-      }
-      c.strokeStyle='#f6fff5';c.lineWidth=1.05;c.beginPath();c.arc(p.x,p.y,r,0,TAU);c.stroke();
-      if(pair[0]!==pair[1]){c.strokeStyle='#224f58';c.lineWidth=.65;c.beginPath();c.moveTo(p.x-r,p.y);c.lineTo(p.x+r,p.y);c.stroke();}
-
+      const p=at(columns===1?.43:.24+col/(columns-1)*.37,rows?(row?5.6:-5.6):0);
+      drawMarker(c,p.x,p.y,4.4,options.snps[i],options.snpPalettes?.[i]);
     }
   }
   // Five short gill slits on each flank, behind the eyes.
@@ -91,5 +101,5 @@ function draw(c,animal,time=0,options={}){
   }
   c.restore();
 }
-root.SharkCharacter={draw,profiles,followTurn,makeSpine};
+root.SharkCharacter={draw,drawMarker,profiles,followTurn,makeSpine};
 })(globalThis);

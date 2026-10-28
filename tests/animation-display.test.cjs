@@ -88,3 +88,27 @@ test('the SNP fill palette contains exactly the four agreed colours',()=>{
   const colours=new Set(styles.flatMap(s=>s.colors));assert.equal(colours.size,4);
   assert.deepEqual([...colours].sort(),['#f4c98b','#aab0b2','#29d1be','#f6a183'].sort());
 });
+
+
+test('genotype dosage counts allele A, with exact fixation kept distinct from almost-fixed frequencies',()=>{
+  assert.equal(D.dosage([false,false]),0);assert.equal(D.dosage([true,false]),1);
+  assert.equal(D.dosage([false,true]),1);assert.equal(D.dosage([true,true]),2);
+  assert.equal(D.locusState(1,1),'shared-fixed');assert.equal(D.locusState(0,1),'opposite-fixed');
+  assert.equal(D.locusState(.999999,1),'segregating');
+  assert.equal(D.allelePercent(1),'100%');assert.equal(D.allelePercent(0),'0%');
+  assert.equal(D.allelePercent(.999999),'>99.99%');assert.equal(D.allelePercent(.000001),'<0.01%');
+  assert.equal(D.allelePercent(.5),'50%');assert.equal(D.allelePercent(.1234),'12.34%');
+});
+
+test('gold genotype markers are empty for B/B, half-filled for A/B, and filled for A/A',()=>{
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation/shark-character.js'),'utf8'),world);
+  function marker(pair){
+    const arcs=[],fills=[];let arc;
+    const c={beginPath(){arc=null;},moveTo(){},closePath(){},arc(...args){arc=args;arcs.push(args);},fill(){fills.push(arc);},stroke(){}};
+    world.SharkCharacter.drawMarker(c,0,0,4,pair,{state:'segregating',colors:['#f4c98b','#f4c98b']});
+    return fills;
+  }
+  assert.equal(marker([false,false]).length,0);
+  const half=marker([true,false]);assert.equal(half.length,1);assert.equal(half[0][4]-half[0][3],Math.PI);
+  const full=marker([true,true]);assert.equal(full.length,1);assert.equal(full[0][4]-full[0][3],2*Math.PI);
+});

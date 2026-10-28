@@ -32,7 +32,7 @@ The channel centre is fixed. Its half-width grows smoothly from 5.3% to at most 
 
 ## SNP colours and fixation
 
-The display uses exactly four SNP fill colours: light gold/orange `#f4c98b` for a locus segregating within at least one basin, grey `#aab0b2` for shared fixation, turquoise `#29d1be` in the west and coral `#f6a183` in the east for opposite fixation. Gold dots retain a dividing line for heterozygous individuals. The fill colour does not distinguish A/A and B/B at a still-variable locus; the original allele-A frequencies remain in the table and bars. These state palettes only affect the drawing, not genotype copies, allele frequencies or tests.
+The display uses exactly four SNP fill colours: light gold/orange `#f4c98b` for a locus segregating within at least one basin, grey `#aab0b2` for shared fixation, turquoise `#29d1be` in the west and coral `#f6a183` in the east for opposite fixation. Within the gold state, fill encodes copies of allele A: empty = 0 (B/B), half-filled = 1 (A/B), filled = 2 (A/A). The portrait shows numeric dosage and genotype for every shown dot, labelled with its original SNP index and dot number. The same copy pair drives the animal marker and the portrait. Fixed states keep their existing full state colours. These state palettes only affect the drawing, not genotype copies, allele frequencies or tests.
 
 All loci up to ten are shown; above ten, ten evenly spaced indices are selected. Each diploid dot follows the body spine. Displayed allele totals round `2 * displayedSideCount * modelFrequency`. Stable ranks depend on the run seed, actor, locus, copy and side, so unchanged frequencies do not reshuffle genotype illustrations. Pure fixation is uniform at a corresponding SNP within a basin. Shared fixed loci can coexist with opposite-fixed loci at FST=1. Both body and portrait use the same palettes. The all-SNP fixation status determines completion, not just the displayed ten loci.
 
@@ -46,3 +46,7 @@ Checks cover model moments and drift, m as a proportion with unequal Ne, invalid
 
 Background: Bailleul et al. (2018), doi:10.1111/eva.12591; Ben Chehida et al. (2020), doi:10.1038/s41437-019-0284-1; Schleimer et al. (2024), doi:10.1111/icad.12725.
 
+
+## Full SNP frequency view
+
+All selected loci are listed in stable index order, with paired west/east allele-A frequency bars per SNP. The panel uses a scrollable two-column layout (one column on narrow phones), marks the ten displayed dot indices, and can filter to loci still segregating within at least one basin. Summary counts are computed before filtering. Exact 0/1 frequencies determine fixation. Unfixed near-endpoint frequencies use <0.01% or >99.99% labels. Display filters do not alter population frequencies, study samples, FST, or stopping. Rendering is cached for the current population snapshot and filter, so completing study resampling does not rebuild an unchanged list.
