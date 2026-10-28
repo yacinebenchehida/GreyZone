@@ -51,11 +51,28 @@ function reset(){
   $('sample-result').innerHTML='<span class="sample-icon">?</span><strong>What would your study find?</strong><p>The barrier can be real even when the genetic test misses it.</p>';$('sample-history').textContent='';sync();scheduleFrame();
 }
 function startRun(){reset();hasRun=true;split=true;running=true;paused=false;$('split').textContent='Run again';$('take-sample').disabled=false;sync();calculatePower();}
-function sync(){const g=pop.generation;setText('generation',number(g));$('play').disabled=!split||finished;$('step').disabled=!split||finished||stepPowerTarget!==null;setText('play',finished?'Fixed':running?'Pause':'Resume');$('play').setAttribute('aria-pressed',String(paused));$('calculate-power').setAttribute('aria-pressed',String(paused));setText('phase',split?(s.m?'Two populations connected by migration.':'Demographically independent populations.'):'One connected population.');$('barrier-label').hidden=!split;$('channel-label').hidden=!split||!s.m;setText('fst-value','FST '+M.fst(pop.a,pop.b).toFixed(4));if(!split)setText('story','Choose Ne, m and your study design, then press Run simulation.');else if(!g)setText('story','The split has started. Both populations begin with identical allele frequencies.');else setText('story',s.m?`Generation ${g}: drift pulls the populations apart; migrants reconnect their gene pools.`:`Generation ${g}: no individuals cross. A genetic study may still miss the separation.`);if(finished)setText('story',`All ${s.loci} SNPs are fixed at generation ${number(g)}. Run again for a new history.`);const sorted=GreyDisplay.sorting([pop.a,pop.b]);setText('sorting-status',`${sorted.total-sorted.fixed}/${sorted.total} segregating · ${sorted.fixed-sorted.opposite}/${sorted.total} fixed identically · ${sorted.opposite}/${sorted.total} fixed differently.`);renderSnps();plotFst();plotPower();}
+function sync(){const g=pop.generation;setText('generation',number(g));$('play').disabled=!split||finished;$('step').disabled=!split||finished||stepPowerTarget!==null;setText('play',finished?'Fixed':running?'Pause':'Resume');$('play').setAttribute('aria-pressed',String(paused));$('calculate-power').setAttribute('aria-pressed',String(paused));setText('phase',split?(s.m?'Two populations connected by migration.':'Demographically independent populations.'):'One connected population.');$('barrier-label').hidden=!split;$('channel-label').hidden=!split||!s.m;setText('fst-value','FST '+M.fst(pop.a,pop.b).toFixed(4));if(!split)setText('story','Choose Ne, m and your study design, then press Run simulation.');else if(!g)setText('story','The split has started. Both populations begin with identical allele frequencies.');else setText('story',s.m?`Generation ${g}: drift pulls the populations apart; migrants reconnect their gene pools.`:`Generation ${g}: no individuals cross. A genetic study may still miss the separation.`);if(finished)setText('story',`All ${s.loci} SNPs are fixed at generation ${number(g)}. Run again for a new history.`);renderSnps();plotFst();plotPower();}
 function renderSnps(){
-  const onlyVariable=$('segregating-only').checked;
+  const aggregate=s.loci>100; // Above 100 markers, render only aggregate counts.
+  const onlyVariable=!aggregate&&$('segregating-only').checked; // The individual-marker filter never filters the summary.
   if(snpDisplayPop===pop&&snpDisplayFilter===onlyVariable)return;
   snpDisplayPop=pop;snpDisplayFilter=onlyVariable;
+  const sorted=GreyDisplay.sorting([pop.a,pop.b]); // Count every selected marker, including shared fixation.
+  setText('snp-panel-title',aggregate?'02 / SNP summary':'02 / All SNPs'); // Name the active view.
+  setText('snp-intro',aggregate?'State of all selected SNPs. Every marker is included in the calculations.':'A and B frequencies in each basin. “On animal” marks the SNPs shown on the animals.'); // Describe the active view.
+  $('snp-filter-control').hidden=aggregate; // Show the filter only with individual bars.
+  $('snp-details').hidden=aggregate; // Hide the entire individual-marker view above 100.
+  $('sorting-status').hidden=aggregate; // Avoid duplicating the aggregate counts.
+  $('snp-state-summary').hidden=!aggregate; // Show the count-only view above 100.
+  if(aggregate){ // Do not construct any individual SNP cards in summary mode.
+    setText('snp-summary-total',number(sorted.total)+' SNPs'); // Display the full marker count.
+    setText('snp-segregating-count',number(sorted.total-sorted.fixed)); // Count markers variable within either population.
+    setText('snp-opposite-count',number(sorted.opposite)); // Count markers fixed for different alleles.
+    setText('snp-shared-count',number(sorted.fixed-sorted.opposite)); // Count markers fixed for the same allele.
+    if($('snp-frequencies').innerHTML)$('snp-frequencies').innerHTML=''; // Remove existing cards only when needed.
+    return; // Keep the main-thread display independent of the number of cards otherwise needed.
+  }
+  setText('sorting-status',`${sorted.total-sorted.fixed}/${sorted.total} segregating · ${sorted.fixed-sorted.opposite}/${sorted.total} fixed identically · ${sorted.opposite}/${sorted.total} fixed differently.`); // Retain the existing detailed-view summary.
   const animalSnps=new Set(GreyDisplay.markerIndices(s.loci));
   const labels={'segregating':'Segregating','shared-fixed':'Fixed identically','opposite-fixed':'Fixed differently'};
   let shown=0;const cards=[];

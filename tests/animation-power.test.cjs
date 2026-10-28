@@ -61,9 +61,9 @@ test('Pause preserves an unfinished 1000-study calculation and Resume reproduces
   run.advance({...p,generation:1},true);assert.equal(run.messages.at(-1).max,1);
 });
 test('population input is copied and all selected SNPs are used even above the ten-dot display limit',()=>{
-  const s={...settings,loci:50},p={a:Array(50).fill(.5),b:Array(50).fill(.5),generation:0};
-  // The first 10 SNPs match; the remaining 40 are diagnostic.
-  for(let i=10;i<50;i++){p.a[i]=1;p.b[i]=0;}
+  const s={...settings,loci:1000},p={a:Array(1000).fill(.5),b:Array(1000).fill(.5),generation:0};
+  // The first 100 SNPs match; the other 900 must still enter calculations in summary mode.
+  for(let i=100;i<1000;i++){p.a[i]=1;p.b[i]=0;}
   const expected=M.fst(p.a,p.b),run=studies(91,s,p,{autoDrain:false});p.a.fill(0);p.b.fill(0);run.drain();
   const point=run.messages.at(-1).points[0];assert.equal(point.populationFst,expected);assert.equal(point.power,1);
 });
@@ -96,4 +96,11 @@ test('worker confirms only the fifth consecutive estimate and preserves its star
   for(let t=6;t<=10;t++)run.advance(split(t));
   let data=run.messages.at(-1);assert.equal(data.first,6);assert.equal(data.detection.confirmedAt,10);assert.equal(P.summary(data).generation,6);
   run.advance(same(11));data=run.messages.at(-1);assert.equal(data.first,6);assert.equal(P.summary(data).generation,6);
+});
+
+test('a 1000-SNP study batch retains finite sampling bounds and a calibrated null rejection rate',()=>{
+  const s={...settings,loci:1000},run=studies(617,s,M.initial(s)),data=run.messages.at(-1),point=data.points[0];
+  assert.equal(data.reps,1000);assert(point.hits>=20&&point.hits<=90);
+  assert(Number.isFinite(point.sampleFstMean));assert(point.sampleFstLow<0);assert(point.sampleFstHigh>0);
+  assert(point.sampleFstLow<=point.sampleFstMean&&point.sampleFstMean<=point.sampleFstHigh);
 });
