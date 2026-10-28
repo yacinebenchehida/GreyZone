@@ -49,3 +49,24 @@ The tutorial describes the transition from a connected ancestral population to d
 ## Larger SNP panels
 
 All existing SNP choices are retained, with 750 and 1000 added. Up to 100 SNPs, the population panel shows the complete individual-marker list and its segregating-only filter. Above 100, no individual cards or frequency bars are constructed; only counts of segregating, opposite-fixed and shared-fixed loci are shown. Counts use every selected locus and retain their text nodes as values change. The numerical model, 1000 study resamples, fixation rule and first-ten animal markers are unchanged. Case examples remain unimplemented.
+
+## Prepared repeated studies
+
+The single power worker now builds reusable binomial alias tables for each population and locus at each generation. Probabilities are constructed from the binomial mode by recurrence, with exact fixed endpoints. Sampled allele counts still follow the same binomial distributions. Count-pair contributions to Hudson FST and Pearson chi-square are precomputed for the selected sample size. The worker accumulates scalar totals directly, retaining the 1000 FST estimates for the same percentile calculation instead of allocating two allele-frequency arrays for every study. Significance cutoffs are cached by degrees of freedom by inverting the same gamma-tail function at 0.05. Table preparation and study sampling both yield in short chunks for Pause. All 1000 independent study samples, every selected SNP, per-generation updates, and the five-generation detection rule are retained.
+
+`model.js`, population evolution and single-study inspection are unchanged. The prepared sampling algorithm consumes its random stream differently, so exact Monte Carlo draws differ from earlier versions. Runs remain deterministic within this version, and the population-history RNG remains independent. Multiprocessing is not implemented; the public SNP limit remains 1000.
+
+Validation includes recovery of the full binomial probability mass at sample-size and allele-frequency extremes, reference-formula comparisons on identical sampled counts, cached cutoff decisions, repeated-study power and FST distribution comparisons, retained percentile calculation, and pause/resume during preparation and partial sampling.
+
+Run `node scripts/benchmark_studies.cjs 40 3` to compare the unchanged reference sampler and the prepared sampler at 1000 and 5000 SNPs. Each timing includes generation-specific table preparation, 1000 studies, and sorting the FST estimates; sampler allocation occurs outside the timer. Change the first argument to compare different study sample sizes.
+
+A browser worker comparison used 1000 studies and identical population frequencies for both implementations. Median warm generation updates from three successive batches were:
+
+| Sampled per population | SNPs | Reference worker | Prepared worker |
+| --- | --- | --- | --- |
+| 40 | 1000 | 476 ms | 37 ms |
+| 40 | 5000 | 2218 ms | 506 ms |
+| 100 | 1000 | 790 ms | 38 ms |
+| 100 | 5000 | 3847 ms | 561 ms |
+
+These measurements include worker scheduling and the sampling interval, exclude ocean rendering, and apply to the test browser rather than a measured phone. Repeated runs varied; the earlier 40-individual run measured 439 → 36 ms and 2304 → 298 ms respectively. No fixed device-independent speedup is assumed.

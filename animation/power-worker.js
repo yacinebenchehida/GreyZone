@@ -1,12 +1,12 @@
 // Study resampling of the exact live population pair; no demographic simulation.
-importScripts('model.js?v=five-generations-14','power-result.js?v=five-generations-14');
+importScripts('model.js?v=prepared-studies-23','power-result.js?v=prepared-studies-23','study-sampler.js?v=prepared-studies-23');
 let batch=null;
 onmessage=function(event){
   const message=event.data;
   if(message.type==='init'){
     batch={s:message.settings,id:message.id,seed:message.seed,reps:1000,
       observe:GreyModel.rng((Number(message.seed)>>>0)^0x49c1a72d),
-      points:[],detection:PowerResult.tracker(),task:null,scheduled:false,paused:false,lastProgress:0};
+      points:[],detection:PowerResult.tracker(),sampler:StudySampler.create(message.settings),task:null,scheduled:false,paused:false,lastProgress:0};
     beginStudy(message.population,false);
   }else if(batch&&message.id===batch.id){
     if(message.type==='advance')beginStudy(message.population,Boolean(message.pauseAtTarget));
@@ -20,6 +20,7 @@ function beginStudy(population,pauseAtTarget){
   if(population.generation<=(b.points.at(-1)?.t??-1))return;
   if(b.task)throw new Error('Finish the current generation before requesting another study');
   b.task={population:{a:Array.from(population.a),b:Array.from(population.b),generation:population.generation},index:0,hits:0,fstSum:0,fstSamples:[],pauseAtTarget};
+  b.sampler.begin(b.task.population); // Prepare new tables only for this generation’s copied frequencies.
   b.paused=false;reportProgress(true);schedule();
 }
 function reportProgress(force=false){
@@ -31,9 +32,13 @@ function work(){
   const b=batch,M=GreyModel,start=performance.now();b.scheduled=false;
   if(b.paused||!b.task)return;
   const t=b.task;
+  while(!b.sampler.ready()){ // Yield during table preparation as well as during study sampling.
+    b.sampler.prepareNext();
+    if(performance.now()-start>12){reportProgress();schedule();return;}
+  }
   while(t.index<b.reps){
-    const sample=M.sample(t.population,b.s,b.observe);
-    if(sample.p<=.05)t.hits++;
+    const sample=b.sampler.sample(b.observe); // Fresh binomial draws with direct scalar accumulation.
+    if(sample.significant)t.hits++;
     t.fstSum+=sample.fst;t.fstSamples.push(sample.fst);t.index++;
     if(t.index<b.reps&&performance.now()-start>12){reportProgress();schedule();return;}
   }

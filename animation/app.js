@@ -153,7 +153,7 @@ function showPowerResult(){
 function acceptPower(data){power=data;completedThrough=Math.max(completedThrough,data.max);progress=null;if(isFixed()&&PowerResult.summary(data).status!=='confirming'){finished=true;running=false;paused=true;accumulator=0;stopClocks();if(worker)worker.postMessage({type:'pause',id:job});}sync();}
 function calculatePower(){
   stopWorker();power=null;pendingPower=null;progress=null;pendingProgress=null;completedThrough=-1;stepPowerTarget=null;const id=job;
-  try{worker=new Worker('power-worker.js?v=first-snps-18');}catch(err){running=false;paused=true;sync();setText('power-time','Power unavailable');return;}
+  try{worker=new Worker('power-worker.js?v=prepared-studies-23');}catch(err){running=false;paused=true;sync();setText('power-time','Power unavailable');return;}
   worker.onmessage=event=>{
     const data=event.data;if(data.id!==job)return;
     if(data.type==='progress'){if(paused&&stepPowerTarget===null){pendingProgress=data;return;}progress=data;showPowerResult();return;}

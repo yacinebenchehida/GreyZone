@@ -1,12 +1,13 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
-const M=require('../animation/model.js'),settings={total:2000,ratio:50,m:0,sample:40,loci:50};
+const M=require('../animation/model.js'),S=require('../animation/study-sampler.js'),settings={total:2000,ratio:50,m:0,sample:40,loci:50};
 const context={Math};vm.createContext(context);vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation/power-result.js'),'utf8'),context);const P=context.PowerResult;
 function studies(seed,s,population,{clock=()=>0,autoDrain=true}={}){
-  const messages=[],tasks=[],world={Math,Number,performance:{now:clock},setTimeout(fn){tasks.push(fn);},importScripts(...urls){for(const url of urls){assert.match(url,/^(model|power-result)\.js\?v=[a-z0-9-]+$/);if(url.startsWith('power-result'))vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation/power-result.js'),'utf8'),world);}},postMessage(data){messages.push(JSON.parse(JSON.stringify(data)));}};
+  const messages=[],tasks=[],world={Math,Number,performance:{now:clock},setTimeout(fn){tasks.push(fn);},importScripts(...urls){for(const url of urls){assert.match(url,/^(model|power-result|study-sampler)\.js\?v=[a-z0-9-]+$/);if(!url.startsWith('model'))vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation',url.split('?')[0]),'utf8'),world);}},postMessage(data){messages.push(JSON.parse(JSON.stringify(data)));}};
   vm.createContext(world);vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation/model.js'),'utf8'),world);
   // The sampling worker must never initialise or evolve its own population.
   world.GreyModel.initial=()=>{throw Error('Independent population initialisation is forbidden');};
   world.GreyModel.advance=()=>{throw Error('Independent population evolution is forbidden');};
+  world.GreyModel.sample=()=>{throw Error('Repeated legacy study allocations are forbidden in the prepared worker');};
   vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation/power-worker.js'),'utf8'),world);
   const drain=()=>{let guard=0;while(tasks.length){assert(guard++<10000);tasks.shift()();}};
   const send=message=>world.onmessage({data:{id:91,...message}});
@@ -75,7 +76,8 @@ test('generation-zero rejection remains near 5% across repeated study batches of
 
 test('FST bounds are the 2.5th and 97.5th percentiles of the existing 1000 samples, preserving negative estimates',()=>{
   const seed=123,p=M.initial(settings),point=studies(seed,settings,p).messages.at(-1).points[0];
-  const observe=M.rng((seed>>>0)^0x49c1a72d),values=Array.from({length:1000},()=>M.sample(p,settings,observe).fst).sort((a,b)=>a-b);
+  const observe=M.rng((seed>>>0)^0x49c1a72d),sampler=S.create(settings);sampler.prepare(p);
+  const values=Array.from({length:1000},()=>sampler.sample(observe).fst).sort((a,b)=>a-b);
   const percentile=q=>{const i=999*q,lo=Math.floor(i);return values[lo]*(1-(i-lo))+values[Math.ceil(i)]*(i-lo);};
   assert(Math.abs(point.sampleFstLow-percentile(.025))<1e-14);
   assert(Math.abs(point.sampleFstHigh-percentile(.975))<1e-14);
@@ -103,4 +105,14 @@ test('a 1000-SNP study batch retains finite sampling bounds and a calibrated nul
   assert.equal(data.reps,1000);assert(point.hits>=20&&point.hits<=90);
   assert(Number.isFinite(point.sampleFstMean));assert(point.sampleFstLow<0);assert(point.sampleFstHigh>0);
   assert(point.sampleFstLow<=point.sampleFstMean&&point.sampleFstMean<=point.sampleFstHigh);
+});
+
+test('Pause during prepared sampling preserves partial studies and resumes to the identical completed batch',()=>{
+  let time=0;const population=M.initial(settings),run=studies(351,settings,population,{clock:()=>++time,autoDrain:false});
+  let slices=0;
+  while(!run.messages.some(message=>message.type==='progress'&&message.done>0)){assert(slices++<50);run.runOne();}
+  run.send({type:'pause'});run.drain();assert(!run.messages.some(message=>message.points));
+  const count=run.messages.length;run.drain();assert.equal(run.messages.length,count);
+  run.send({type:'resume'});run.drain();
+  assert.deepEqual(run.messages.at(-1).points,studies(351,settings,population).messages.at(-1).points);
 });
