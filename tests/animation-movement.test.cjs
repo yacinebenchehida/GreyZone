@@ -50,7 +50,7 @@ test('reduced motion places the split representatives in their basins without an
 });
 
 
-test('normal travel is slower and covers about 6% of the open-water width per second, with a faster option',()=>{
+test('normal travel is slower and covers about 5% of the open-water width per second, with a faster option',()=>{
   function distance(pace){
     const s=scene(),a=s.animals[0];s.animals=[a];s.travelPace=pace;
     a.settle=null;a.x=.15;a.y=.5;a.heading=0;a.speed=.05;
@@ -59,8 +59,8 @@ test('normal travel is slower and covers about 6% of the open-water width per se
     for(let i=0;i<60;i++){s.clock+=1/60;s.update(1/60,{split:false,m:0});}
     return (a.x*s.w-start)/s.w;
   }
-  const normal=distance(1.3),fast=distance(2.2);
-  assert(normal>=.06&&normal<.07);assert(fast>normal*1.6);
+  const normal=distance(.95),fast=distance(1.6);
+  assert(normal>=.045&&normal<.05);assert(fast>normal*1.6);
 });
 
 test('the scene creates the requested scaled headcount and split, and starts more exchanges at higher migration',()=>{
@@ -77,7 +77,8 @@ test('the scene creates the requested scaled headcount and split, and starts mor
     for(let frame=0;frame<600;frame++){s.clock+=.1;s.update(.1,{split:true,m,generationRate:12});assert(s.animals.filter(a=>a.cross).length<=3,'At most three individuals may be in transit');}
     starts.push(s.migrationStarts);
   }
-  assert.equal(starts[0],0);assert(starts[1]>0&&starts[1]<starts[2]&&starts[2]<starts[3]);
+  assert.equal(starts[0],0);// Slower travel can saturate the three-shark transit cap at the upper rates.
+  assert(starts[1]>0&&starts[1]<starts[2]&&starts[2]<=starts[3],JSON.stringify(starts));
   const stopped=s.migrationStarts;
   for(let frame=0;frame<100;frame++){s.clock+=.05;s.update(.05,{split:true,m:.1,generationRate:0});}
   assert.equal(s.migrationStarts,stopped,'Stopped generation playback must not launch new migrants');

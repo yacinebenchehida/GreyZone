@@ -4,10 +4,10 @@
 'use strict';
 const TAU=Math.PI*2,clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 class OceanScene{
-  constructor(canvas){this.canvas=canvas;this.c=canvas.getContext('2d');this.w=1000;this.h=540;this.clock=0;this.last=0;this.wasSplit=false;this.raised=0;this.selected=-1;this.hover=-1;this.reduced=matchMedia('(prefers-reduced-motion: reduce)');canvas.addEventListener('pointermove',e=>{const b=canvas.getBoundingClientRect(),x=e.clientX-b.left,y=e.clientY-b.top;let best=34;this.hover=-1;for(const a of this.animals||[]){const d=Math.hypot(a.x*this.w-x,a.y*this.h-y);if(d<best){best=d;this.hover=a.id;}}canvas.style.cursor=this.hover<0?'default':'pointer';});canvas.addEventListener('pointerleave',()=>{this.hover=-1;});canvas.addEventListener('click',()=>{this.selected=this.selected===this.hover?-1:this.hover;});}
+  constructor(canvas){this.canvas=canvas;this.c=canvas.getContext('2d');this.w=1000;this.h=540;this.clock=0;this.last=0;this.wasSplit=false;this.raised=0;this.selected=-1;this.hover=-1;this.reduced=matchMedia('(prefers-reduced-motion: reduce)');canvas.addEventListener('pointermove',e=>{const b=canvas.getBoundingClientRect(),x=e.clientX-b.left,y=e.clientY-b.top;let best=34;this.hover=-1;for(const a of this.animals||[]){const d=Math.hypot(a.x*this.w-x,a.y*this.h-y);if(d<best){best=d;this.hover=a.id;}}canvas.style.cursor=this.hover<0?'default':'pointer';this.onInspect?.();});canvas.addEventListener('pointerleave',()=>{this.hover=-1;this.onInspect?.();});canvas.addEventListener('click',()=>{this.selected=this.selected===this.hover?-1:this.hover;this.onInspect?.();});}
   reset(settings){
     this.settings=settings;this.random=GreyModel.rng(settings.displaySeed??8102);this.wasSplit=false;this.raised=0;this.selected=-1;this.clock=0;this.last=0;this.migrationBudget=0;this.migrationStarts=0;this.nextMigration=0;this.markerCache=null;this.frozenKey=null;
-    this.travelPace=this.travelPace||1.3;
+    this.travelPace=this.travelPace||.95;
     this.display=GreyDisplay.summary(settings);
     const r=this.random,n=this.display.total,left=this.display.west;
     this.animals=Array.from({length:n},(_,i)=>{
@@ -18,7 +18,7 @@ class OceanScene{
     });
     this.sparks=Array.from({length:90},()=>({x:r(),y:r(),phase:r()*TAU,size:.5+r()}));this.resize();
   }
-  resize(){const b=this.canvas.getBoundingClientRect();this.w=b.width||1000;this.h=b.height||540;this.dpr=Math.min(2,devicePixelRatio||1);this.canvas.width=Math.round(this.w*this.dpr);this.canvas.height=Math.round(this.h*this.dpr);this.c.setTransform(this.dpr,0,0,this.dpr,0,0);this.makeWater();}
+  resize(){this.frozenKey=null;const b=this.canvas.getBoundingClientRect();this.w=b.width||1000;this.h=b.height||540;this.dpr=Math.min(2,devicePixelRatio||1);this.canvas.width=Math.round(this.w*this.dpr);this.canvas.height=Math.round(this.h*this.dpr);this.c.setTransform(this.dpr,0,0,this.dpr,0,0);this.makeWater();}
   coast(y,growth=1){const f=y/this.h;return {x:this.w*(.5+.027*Math.sin(f*5.6-.8)+.016*Math.sin(f*12+1)),half:this.w*(.043+.018*Math.sin(f*7+.3)**2+.018*Math.exp(-(((f-.27)/.17)**2)))*growth};}
   gap(){const m=this.settings.m||0;return {y:this.h*.565,half:this.h*(.053+.022*Math.min(1,Math.log1p(m*1000)/Math.log(501)))};}
   landPath(c,y0,y1,growth,pad=0){const pts=[];for(let y=y0;y<=y1;y+=5)pts.push(y);pts.push(y1);c.beginPath();for(let i=0;i<pts.length;i++){const y=pts[i],b=this.coast(y,growth),jag=Math.sin(y*.071)*2+Math.cos(y*.123)*1.3,x=b.x-b.half-pad+jag*growth;i?c.lineTo(x,y):c.moveTo(x,y);}for(let i=pts.length-1;i>=0;i--){const y=pts[i],b=this.coast(y,growth),jag=Math.cos(y*.064)*2+Math.sin(y*.147)*1.5;c.lineTo(b.x+b.half+pad+jag*growth,y);}c.closePath();}

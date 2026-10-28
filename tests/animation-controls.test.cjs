@@ -9,14 +9,14 @@ const vm=require('node:vm');
 function app(overrides={}){
   const elements=new Map(),listeners={},gradient={addColorStop(){}};
   const drawing=new Proxy({createLinearGradient:()=>gradient,createRadialGradient:()=>gradient},{get:(o,k)=>o[k]||(()=>{})});
-  const defaults={total:20000,ratio:50,migration:0,'sample-size':40,loci:50,speed:6,'travel-speed':1.3,'shark-design':'hammer',...overrides};
+  const defaults={total:20000,ratio:50,migration:0,'sample-size':40,loci:50,speed:6,'travel-speed':.95,'shark-design':'hammer',...overrides};
   function element(id){
     if(!elements.has(id))elements.set(id,{value:String(defaults[id]??''),checked:false,disabled:false,hidden:false,style:{},options:[],textContent:'',attributes:{},
       setAttribute(name,value){this.attributes[name]=value;},addEventListener(){},
       getContext:()=>drawing,getBoundingClientRect:()=>({width:940,height:540})});
     return elements.get(id);
   }
-  let time=1000,frame,scene,timerId=0,seed=100;const timers=new Map(),workers=[];
+  let time=1000,scene,timerId=0,frameId=0,framesRun=0,seed=100;const timers=new Map(),frames=new Map(),workers=[];
   const document={hidden:false,getElementById:element,createElement:()=>({getContext:()=>drawing}),addEventListener:(event,fn)=>{listeners[event]=fn;}};
   const world={Math,Number,document,crypto:{getRandomValues(value){value[0]=++seed;return value;}},setTimeout:fn=>{timers.set(++timerId,fn);return timerId;},clearTimeout:id=>timers.delete(id),Worker:class{
       constructor(){workers.push(this);this.points=[];}
@@ -27,17 +27,17 @@ function app(overrides={}){
       }
       terminate(){this.terminated=true;}
     },devicePixelRatio:1,matchMedia:()=>({matches:false}),performance:{now:()=>time},
-    Path2D:class{constructor(){return drawing;}},ResizeObserver:class{observe(){}},requestAnimationFrame:fn=>{frame=fn;}};
+    Path2D:class{constructor(){return drawing;}},ResizeObserver:class{observe(){}},requestAnimationFrame:fn=>{frames.set(++frameId,fn);return frameId;},cancelAnimationFrame:id=>frames.delete(id)};
   vm.createContext(world);
   for(const name of ['model.js','population-display.js','swim-motion.js','shark-character.js','ocean-scene.js','power-result.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation',name),'utf8'),world);
   const Scene=world.OceanScene;world.OceanScene=class extends Scene{constructor(...args){super(...args);scene=this;}};
   if(overrides.advanceOverride)world.GreyModel.advance=overrides.advanceOverride;
   if(overrides.startGeneration!==undefined){const initial=world.GreyModel.initial;world.GreyModel.initial=s=>({...initial(s),generation:overrides.startGeneration});}
   vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation/app.js'),'utf8'),world);
-  const tick=(n=1)=>{for(let i=0;i<n;i++){time+=1000/60;frame(time);}};
+  const tick=(n=1)=>{for(let i=0;i<n;i++){time+=1000/60;for(const [id,fn]of [...frames]){frames.delete(id);framesRun++;fn(time);}}};
   const click=id=>{assert(!element(id).disabled,`${id} should be enabled`);element(id).onclick();};
   const state=()=>({generation:element('generation').textContent,clock:scene.clock,migrationBudget:scene.migrationBudget,animals:JSON.stringify(scene.animals),fst:element('fst-chart').innerHTML});
-  return {element,tick,click,state,scene,workers,runTimers(){for(const [id,fn]of [...timers]){timers.delete(id);fn();}},visibility(hidden){document.hidden=hidden;listeners.visibilitychange();}};
+  return {element,tick,click,state,scene,workers,pendingClocks:()=>({frames:frames.size,timers:timers.size,framesRun}),runTimers(){for(const [id,fn]of [...timers]){timers.delete(id);fn();}},visibility(hidden){document.hidden=hidden;listeners.visibilitychange();}};
 }
 
 test('Pause freezes generations, shark motion, body waves and the ocean clock; Play resumes without a reset or time jump',()=>{
@@ -46,7 +46,7 @@ test('Pause freezes generations, shark motion, body waves and the ocean clock; P
   a.click('split');a.tick(60);
   assert.equal(a.element('play').textContent,'Pause');assert(Number(a.state().generation)>0);
   a.click('play');assert.equal(a.element('play').textContent,'Resume');
-  const paused=a.state();a.tick(600);
+  const paused=a.state(),clocks=a.pendingClocks();assert.equal(clocks.frames,0);assert.equal(clocks.timers,0);a.tick(600);assert.deepEqual(a.pendingClocks(),clocks,'No animation callback should run while paused');
   assert.deepEqual(a.state(),paused,'Both simulation and decorative clocks must stay frozen');
   // Inspecting or sampling the paused scene must not restart it.
   a.click('meet-shark');a.click('take-sample');a.tick(10);assert.deepEqual(a.state(),paused);
@@ -103,7 +103,7 @@ test('isolated 100-individual live history fixes the ten displayed SNPs and keep
   const draw=a.scene.draw;a.scene.draw=()=>{};
   for(let i=0;i<1600&&!a.element('step').disabled;i++)a.click('step');
   a.scene.draw=draw;
-  a.element('show-markers').checked=true;a.tick();
+  a.element('show-markers').checked=true;a.element('show-markers').onchange();a.tick();
   assert.match(a.element('sorting-status').textContent,/Fixed on both sides: 50\/50/);
   assert.equal(a.element('fst-value').textContent,'FST 1.0000');assert.equal(a.element('play').textContent,'Fixed');assert(a.element('play').disabled);
   const fixed=a.state();a.tick(60);assert.deepEqual(a.state(),fixed);
@@ -159,4 +159,17 @@ test('migration prevents a transient opposite fixation from ending the run',()=>
 test('a generation beyond the former 200000 limit remains runnable when SNPs still segregate',()=>{
   const a=app({total:20,loci:5,startGeneration:200000});a.click('split');a.click('step');
   assert.equal(Number(a.state().generation.replaceAll(',','')),200001);assert(!a.element('play').disabled);assert(!a.element('step').disabled);
+});
+
+
+test('pausing in a background tab cancels every timer and resumes with one clock',()=>{
+  const a=app({total:20});a.click('split');a.visibility(true);
+  assert.equal(a.pendingClocks().frames,0);assert.equal(a.pendingClocks().timers,1);
+  a.click('calculate-power');assert.equal(a.pendingClocks().timers,0);
+  const paused=a.state();a.tick(600);a.runTimers();assert.deepEqual(a.state(),paused);
+  a.visibility(false);assert.equal(a.pendingClocks().frames,0);
+  a.click('play');assert.equal(a.pendingClocks().frames,1);
+  a.click('play');assert.equal(a.pendingClocks().frames,0);
+  a.click('play');assert.equal(a.pendingClocks().frames,1);
+  a.tick(60);assert(Number(a.state().generation)>Number(paused.generation));
 });
