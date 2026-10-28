@@ -92,8 +92,29 @@ function draw(c,a,time=0,options={}){
   const kind=options.variant||'hammer';
   if(kind==='hammer'||kind==='classic'){SharkCharacter.draw(c,a,time,options);return;}
   if(kind==='surgeon'){FishCharacter.draw(c,{...a,scale:(a.scale||1)*1.25},time,{species:'surgeon',snps:options.snps,snpPalettes:options.snpPalettes});return;}
-  wake(c,a,time,kind);
+  if(!options.skipWake)wake(c,a,time,kind);
   if(kind==='turtle')drawTurtle(c,a,time,options);else if(kind==='tuna')drawTuna(c,a,time,options);else if(kind==='orca')drawOrca(c,a,time,options);else if(kind==='seal')drawSeal(c,a,time,options);
 }
-root.SeaLife={draw,info,catalogue};
+// Marker-only overlay for cached bodies. Coordinates match each original renderer.
+function drawMarkers(c,a,options){
+  const kind=options.variant||'hammer',n=Math.min(10,options.snps?.length||0),cols=n>5?5:n;
+  if(!n)return;
+  c.save();let at,r=4.3;
+  if(kind==='hammer'||kind==='classic'){
+    at=SharkCharacter.makeSpine(a).at;r=4.4;
+    for(let i=0;i<n;i++){const p=at(cols===1?.43:.24+(i%cols)/(cols-1)*.37,n>5?(i<5?-5.6:5.6):0);SharkCharacter.drawMarker(c,p.x,p.y,r,options.snps[i],options.snpPalettes?.[i]);}
+  }else if(kind==='turtle'){
+    c.rotate(Math.sin((a.stroke||0)*.22)*.018);
+    for(let i=0;i<n;i++){const x=cols===1?0:21-(i%cols)/(cols-1)*43,y=n>5?(i<5?-6:6):0;SharkCharacter.drawMarker(c,x,y,3.8,options.snps[i],options.snpPalettes?.[i]);}
+  }else{
+    if(kind==='surgeon'){
+      c.scale(1.25,1.25);r=3.35;
+      const spine=u=>({x:45-92*u,y:Math.pow(u,1.9)*(Math.sin(u*6.3-(a.stroke||0))*(3+(a.effort??1)*4)+(a.bend||0)*15)});
+      at=(u,offset)=>{const p=spine(u),q=spine(u+.002),angle=Math.atan2(p.y-q.y,p.x-q.x);return {x:p.x-Math.sin(angle)*offset,y:p.y+Math.cos(angle)*offset};};
+    }else at=field(a,kind).at;
+    for(let i=0;i<n;i++){const p=at(cols===1?.4:.25+(i%cols)/(cols-1)*.35,n>5?(i<5?-5.5:5.5):0);SharkCharacter.drawMarker(c,p.x,p.y,r,options.snps[i],options.snpPalettes?.[i]);}
+  }
+  c.restore();
+}
+root.SeaLife={draw,drawMarkers,info,catalogue};
 })(globalThis);

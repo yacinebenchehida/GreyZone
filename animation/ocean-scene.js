@@ -4,7 +4,7 @@
 'use strict';
 const TAU=Math.PI*2,clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 class OceanScene{
-  constructor(canvas){this.canvas=canvas;this.c=canvas.getContext('2d');this.w=1000;this.h=540;this.clock=0;this.last=0;this.wasSplit=false;this.raised=0;this.selected=-1;this.hover=-1;this.reduced=matchMedia('(prefers-reduced-motion: reduce)');canvas.addEventListener('pointermove',e=>{const b=canvas.getBoundingClientRect(),x=e.clientX-b.left,y=e.clientY-b.top;let best=34;this.hover=-1;for(const a of this.animals||[]){const d=Math.hypot(a.x*this.w-x,a.y*this.h-y);if(d<best){best=d;this.hover=a.id;}}canvas.style.cursor=this.hover<0?'default':'pointer';this.onInspect?.();});canvas.addEventListener('pointerleave',()=>{this.hover=-1;this.onInspect?.();});canvas.addEventListener('click',()=>{this.selected=this.selected===this.hover?-1:this.hover;this.onInspect?.();});}
+  constructor(canvas){this.canvas=canvas;this.c=canvas.getContext('2d');this.w=1000;this.h=540;this.clock=0;this.last=0;this.wasSplit=false;this.raised=0;this.selected=-1;this.hover=-1;this.detail='full';this.slowDraws=0;this.pendingLite=false;this.poseCache=new AnimalPoseCache();this.reduced=matchMedia('(prefers-reduced-motion: reduce)');canvas.addEventListener('pointermove',e=>{const b=canvas.getBoundingClientRect(),x=e.clientX-b.left,y=e.clientY-b.top;let best=34;this.hover=-1;for(const a of this.animals||[]){const d=Math.hypot(a.x*this.w-x,a.y*this.h-y);if(d<best){best=d;this.hover=a.id;}}canvas.style.cursor=this.hover<0?'default':'pointer';this.onInspect?.();});canvas.addEventListener('pointerleave',()=>{this.hover=-1;this.onInspect?.();});canvas.addEventListener('click',()=>{this.selected=this.selected===this.hover?-1:this.hover;this.onInspect?.();});}
   reset(settings){
     this.settings=settings;this.random=GreyModel.rng(settings.displaySeed??8102);this.wasSplit=false;this.raised=0;this.selected=-1;this.clock=0;this.last=0;this.migrationBudget=0;this.migrationStarts=0;this.nextMigration=0;this.markerCache=null;this.frozenKey=null;
     this.travelPace=this.travelPace||.95;
@@ -18,7 +18,7 @@ class OceanScene{
     });
     this.sparks=Array.from({length:90},()=>({x:r(),y:r(),phase:r()*TAU,size:.5+r()}));this.resize();
   }
-  resize(){this.frozenKey=null;const b=this.canvas.getBoundingClientRect();this.w=b.width||1000;this.h=b.height||540;this.dpr=Math.min(2,devicePixelRatio||1);this.canvas.width=Math.round(this.w*this.dpr);this.canvas.height=Math.round(this.h*this.dpr);this.c.setTransform(this.dpr,0,0,this.dpr,0,0);this.makeWater();}
+  resize(){this.frozenKey=null;const b=this.canvas.getBoundingClientRect();this.w=b.width||1000;this.h=b.height||540;this.dpr=Math.min(this.detail==='lite'?1.25:2,devicePixelRatio||1);this.canvas.width=Math.round(this.w*this.dpr);this.canvas.height=Math.round(this.h*this.dpr);this.c.setTransform(this.dpr,0,0,this.dpr,0,0);this.makeWater();}
   coast(y,growth=1){const f=y/this.h;return {x:this.w*(.5+.027*Math.sin(f*5.6-.8)+.016*Math.sin(f*12+1)),half:this.w*(.043+.018*Math.sin(f*7+.3)**2+.018*Math.exp(-(((f-.27)/.17)**2)))*growth};}
   gap(){const m=this.settings.m||0;return {y:this.h*.565,half:this.h*(.053+.022*Math.min(1,Math.log1p(m*1000)/Math.log(501)))};}
   landPath(c,y0,y1,growth,pad=0){
@@ -113,10 +113,11 @@ class OceanScene{
   markerCopies(a){return this.markerCache.data.get(a.id);}
   drawShark(a,state){
     const c=this.c,x=a.x*this.w,y=a.y*this.h,scale=this.actorScale(a);
-    c.save();c.translate(x+8,y+11);c.rotate(a.heading);c.scale(scale,scale*.43);
+    if(this.detail!=='lite'){c.save();c.translate(x+8,y+11);c.rotate(a.heading);c.scale(scale,scale*.43);
     const shadow=c.createRadialGradient(-15,0,3,-15,0,85);shadow.addColorStop(0,'#0b52674d');shadow.addColorStop(1,'#125b6e00');
-    c.fillStyle=shadow;c.beginPath();c.arc(-15,0,85,0,TAU);c.fill();c.restore();
-    SeaLife.draw(c,{x,y,heading:a.heading,scale,stroke:a.stroke,effort:a.effort,bend:a.bend,phase:a.phase,id:a.id},this.clock,{variant:this.variant||'hammer',snps:state.markers?this.markerCopies(a):null,snpPalettes:state.markers?this.markerCache.palettes:null});
+    c.fillStyle=shadow;c.beginPath();c.arc(-15,0,85,0,TAU);c.fill();c.restore();}
+    const actor={x,y,heading:a.heading,scale,stroke:a.stroke,effort:a.effort,bend:a.bend,phase:a.phase,id:a.id},options={variant:this.variant||'hammer',snps:state.markers?this.markerCopies(a):null,snpPalettes:state.markers?this.markerCache.palettes:null};
+    if(this.detail!=='lite'||!this.poseCache.draw(c,actor,this.clock,options))SeaLife.draw(c,actor,this.clock,options);
     if(a.id===this.selected||a.id===this.hover){c.save();c.strokeStyle='#e3f8daaa';c.lineWidth=1;c.setLineDash([3,5]);c.beginPath();c.arc(x,y,48*scale,0,TAU);c.stroke();c.restore();}
   }
   drawPortrait(a,state){
@@ -142,7 +143,37 @@ class OceanScene{
     c.fillStyle='#72877f';c.font='9px Arial, sans-serif';c.fillText(`${indices.length} of ${state.p1.length} SNPs · click the shark to close`,x,y+h-10);c.restore();
   }
 
-  draw(state){const now=performance.now()/1000,dt=this.last?Math.min(.05,now-this.last):0;this.last=now;if(!this.animals)return;const frozenKey=[state.split,state.generation,state.m,state.markers,this.selected,this.hover,this.variant,this.w,this.h].join('|');if(state.paused&&this.frozenKey===frozenKey)return;this.frozenKey=state.paused?frozenKey:null;if(!this.reduced.matches&&!state.paused)this.clock+=dt;if(state.split&&!this.wasSplit){this.raised=this.clock;this.assignSides();}if(!state.split)this.raised=0;this.wasSplit=state.split;if(!state.paused)this.update(dt,state);this.prepareMarkers(state);this.c.clearRect(0,0,this.w,this.h);this.drawWater();for(const a of this.animals)this.drawShark(a,state);if(state.split){const progress=this.reduced.matches?1:clamp((this.clock-this.raised)/4.8,0,1);this.drawLand(state,progress);}const selected=this.animals.find(a=>a.id===this.selected);if(selected)this.drawPortrait(selected,state);}
+  draw(state){
+    const started=performance.now(),now=started/1000;
+    // A long suspension is bounded, but ordinary dropped frames keep elapsed
+    // time. Substeps keep turning and barrier avoidance stable at low FPS.
+    const dt=this.last?clamp(now-this.last,0,.5):0;this.last=now;if(!this.animals)return;
+    if(this.pendingLite&&!state.paused){this.pendingLite=false;this.detail='lite';this.resize();}
+    const frozenKey=[state.split,state.generation,state.m,state.markers,this.selected,this.hover,this.variant,this.w,this.h].join('|');
+    if(state.paused&&this.frozenKey===frozenKey)return;
+    this.frozenKey=state.paused?frozenKey:null;
+    if(!this.reduced.matches&&!state.paused)this.clock+=dt;
+    if(state.split&&!this.wasSplit){this.raised=this.clock;this.assignSides();}
+    if(!state.split)this.raised=0;this.wasSplit=state.split;
+    if(!state.paused){
+      const end=this.clock,steps=Math.max(1,Math.ceil(dt/.05-1e-9));
+      for(let i=0;i<steps;i++){
+        if(steps>1&&!this.reduced.matches)this.clock=end-dt+(i+1)*dt/steps;
+        this.update(dt/steps,state);
+      }
+      this.clock=end;
+    }
+    this.prepareMarkers(state);this.c.clearRect(0,0,this.w,this.h);this.drawWater();
+    for(const a of this.animals)this.drawShark(a,state);
+    if(state.split){const progress=this.reduced.matches?1:clamp((this.clock-this.raised)/4.8,0,1);this.drawLand(state,progress);}
+    const selected=this.animals.find(a=>a.id===this.selected);if(selected)this.drawPortrait(selected,state);
+    // Eight over-budget draws are required; one expensive startup frame never
+    // changes a fast device. The existing full-detail renderer is the default.
+    if(!state.paused&&dt>0&&this.detail==='full'){
+      const cost=performance.now()-started;this.slowDraws=Math.max(0,this.slowDraws+(cost>20?1:-1));
+      if(this.slowDraws>=8)this.pendingLite=true;
+    }
+  }
 
 }
 root.OceanScene=OceanScene;

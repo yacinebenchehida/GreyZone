@@ -21,7 +21,7 @@ function app(overrides={}){
       getContext:()=>drawing,getBoundingClientRect:()=>({width:940,height:540})});
     return elements.get(id);
   }
-  let time=1000,scene,timerId=0,frameId=0,framesRun=0,seed=100;const timers=new Map(),frames=new Map(),workers=[];
+  let time=1000,scene,timerId=0,frameId=0,framesRun=0,seed=100;const timers=new Map(),frames=new Map(),workers=[];let intersection;
   const document={hidden:false,getElementById:element,createTextNode:textNode,createElement:()=>({getContext:()=>drawing}),addEventListener:(event,fn)=>{listeners[event]=fn;}};
   const world={Math,Number,document,crypto:{getRandomValues(value){value[0]=++seed;return value;}},setTimeout:fn=>{timers.set(++timerId,fn);return timerId;},clearTimeout:id=>timers.delete(id),Worker:class{
       constructor(){workers.push(this);this.points=[];}
@@ -33,16 +33,17 @@ function app(overrides={}){
       terminate(){this.terminated=true;}
     },devicePixelRatio:1,matchMedia:()=>({matches:false}),performance:{now:()=>time},
     Path2D:class{constructor(){return drawing;}},ResizeObserver:class{observe(){}},requestAnimationFrame:fn=>{frames.set(++frameId,fn);return frameId;},cancelAnimationFrame:id=>frames.delete(id)};
+  if(overrides.intersection)world.IntersectionObserver=class{constructor(fn){intersection=fn;}observe(){}};
   vm.createContext(world);
-  for(const name of ['model.js','population-display.js','swim-motion.js','shark-character.js','fish-character.js','marine-life.js','island-scene.js','ocean-scene.js','power-result.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation',name),'utf8'),world);
+  for(const name of ['model.js','population-display.js','swim-motion.js','shark-character.js','fish-character.js','marine-life.js','animal-cache.js','island-scene.js','ocean-scene.js','power-result.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation',name),'utf8'),world);
   const Scene=world.OceanScene;world.OceanScene=class extends Scene{constructor(...args){super(...args);scene=this;}};
   if(overrides.advanceOverride)world.GreyModel.advance=overrides.advanceOverride;
   if(overrides.startGeneration!==undefined){const initial=world.GreyModel.initial;world.GreyModel.initial=s=>({...initial(s),generation:overrides.startGeneration});}
   vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation/app.js'),'utf8'),world);
-  const tick=(n=1)=>{for(let i=0;i<n;i++){time+=1000/60;for(const [id,fn]of [...frames]){frames.delete(id);framesRun++;fn(time);}}};
+  const tick=(n=1,frameMs=1000/60)=>{for(let i=0;i<n;i++){time+=frameMs;for(const [id,fn]of [...frames]){frames.delete(id);framesRun++;fn(time);}}};
   const click=id=>{assert(!element(id).disabled,`${id} should be enabled`);element(id).onclick();};
   const state=()=>({generation:element('generation').textContent,clock:scene.clock,migrationBudget:scene.migrationBudget,animals:JSON.stringify(scene.animals),fst:element('fst-chart').innerHTML});
-  return {element,tick,click,state,scene,workers,pendingClocks:()=>({frames:frames.size,timers:timers.size,framesRun}),runTimers(){for(const [id,fn]of [...timers]){timers.delete(id);fn();}},visibility(hidden){document.hidden=hidden;listeners.visibilitychange();}};
+  return {element,tick,click,state,scene,workers,oceanVisibility(visible){intersection([{isIntersecting:visible}]);},pendingClocks:()=>({frames:frames.size,timers:timers.size,framesRun}),runTimers(){for(const [id,fn]of [...timers]){timers.delete(id);fn();}},visibility(hidden){document.hidden=hidden;listeners.visibilitychange();}};
 }
 
 test('Pause freezes generations, shark motion, body waves and the ocean clock; Play resumes without a reset or time jump',()=>{
@@ -306,4 +307,35 @@ test('early stable fixation waits for a pending five-generation confirmation bef
     assert.equal(a.element('power-time').textContent,t===5?'1':'Confirming…');
   }
   assert.equal(a.element('play').textContent,'Fixed');assert.match(a.element('power-meaning').textContent,/generation 1 to 5/);
+});
+
+
+test('low frame rates retain elapsed generation time and produce the same population at the same generation',()=>{
+  const slow=app(),stepped=app();slow.scene.draw=()=>{};stepped.scene.draw=()=>{};
+  slow.click('split');stepped.click('split');slow.tick(20,200);
+  for(let i=0;i<20;i++)stepped.click('step');
+  assert.equal(Number(slow.state().generation),20);assert.equal(slow.state().generation,stepped.state().generation);
+  assert.equal(JSON.stringify(slow.workers[0].lastAdvance.population),JSON.stringify(stepped.workers[0].lastAdvance.population));
+  slow.click('play');const paused=slow.state();slow.tick(100,200);assert.deepEqual(slow.state(),paused);
+});
+
+test('scrolling the ocean out of view skips drawing while generations continue, with no jump on return',()=>{
+  const a=app({total:20,loci:5,intersection:true});a.click('split');a.tick(10);
+  let draws=0;const draw=a.scene.draw.bind(a.scene);a.scene.draw=state=>{draws++;draw(state);};
+  const clock=a.scene.clock,generation=Number(a.state().generation),worker=a.workers[0];
+  a.oceanVisibility(false);a.tick(120);
+  assert.equal(draws,0);assert.equal(a.scene.clock,clock);assert(Number(a.state().generation)>generation);assert.equal(a.workers[0],worker);
+  a.oceanVisibility(true);assert.equal(draws,1);assert.equal(a.scene.clock,clock);
+  a.tick();assert(a.scene.clock>clock&&a.scene.clock-clock<.02);
+  a.click('calculate-power');const paused=a.state();a.oceanVisibility(false);a.tick(60);a.oceanVisibility(true);assert.deepEqual(a.state(),paused);
+});
+
+test('both Pause controls freeze cached bodies, SNP overlays and generations after lightweight rendering activates',()=>{
+  const a=app({total:20,loci:10});a.scene.detail='lite';a.scene.resize();a.element('show-markers').checked=true;
+  a.click('split');a.tick(30);assert.equal(a.scene.detail,'lite');const worker=a.workers[0];
+  for(const id of ['play','calculate-power']){
+    a.click(id);const paused=a.state(),images=a.scene.poseCache.images.size;
+    a.tick(120);assert.deepEqual(a.state(),paused);assert.equal(a.scene.poseCache.images.size,images);assert.equal(a.pendingClocks().frames,0);
+    a.click(id);a.tick();assert(a.scene.clock>paused.clock&&a.scene.clock-paused.clock<.02);assert.equal(a.workers[0],worker);
+  }
 });

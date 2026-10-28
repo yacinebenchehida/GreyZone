@@ -1,7 +1,7 @@
 (function(){
 'use strict';
 const M=GreyModel,$=id=>document.getElementById(id),canvas=$('scene'),ocean=new OceanScene(canvas);
-let s,pop,evolve,observe,split=false,running=false,paused=false,history=[],power=null,pendingPower=null,progress=null,pendingProgress=null,completedThrough=-1,stepPowerTarget=null,worker=null,job=0,sampleResults=[],lastSampleGen=-1,last=0,accumulator=0,hasRun=false,runSeed=0,seedCounter=0,finished=false,backgroundTimer=null,animationFrame=null,snpDisplayPop=null,snpDisplayFilter=null;
+let s,pop,evolve,observe,split=false,running=false,paused=false,history=[],power=null,pendingPower=null,progress=null,pendingProgress=null,completedThrough=-1,stepPowerTarget=null,worker=null,job=0,sampleResults=[],lastSampleGen=-1,last=0,accumulator=0,hasRun=false,runSeed=0,seedCounter=0,finished=false,backgroundTimer=null,animationFrame=null,snpDisplayPop=null,snpDisplayFilter=null,oceanVisible=true;
 function settings(){return {total:+$('total').value,ratio:+$('ratio').value,m:+$('migration').value,sample:+$('sample-size').value,loci:+$('loci').value,studies:1000};}
 function number(x){return x.toLocaleString('en-GB');}
 // Retain text nodes: unchanged labels must not be removed and repainted.
@@ -136,7 +136,7 @@ function showPowerResult(){
 function acceptPower(data){power=data;completedThrough=Math.max(completedThrough,data.max);progress=null;if(isFixed()&&PowerResult.summary(data).status!=='confirming'){finished=true;running=false;paused=true;accumulator=0;stopClocks();if(worker)worker.postMessage({type:'pause',id:job});}sync();}
 function calculatePower(){
   stopWorker();power=null;pendingPower=null;progress=null;pendingProgress=null;completedThrough=-1;stepPowerTarget=null;const id=job;
-  try{worker=new Worker('power-worker.js?v=five-generations-14');}catch(err){running=false;paused=true;sync();setText('power-time','Power unavailable');return;}
+  try{worker=new Worker('power-worker.js?v=mobile-render-16');}catch(err){running=false;paused=true;sync();setText('power-time','Power unavailable');return;}
   worker.onmessage=event=>{
     const data=event.data;if(data.id!==job)return;
     if(data.type==='progress'){if(paused&&stepPowerTarget===null){pendingProgress=data;return;}progress=data;showPowerResult();return;}
@@ -175,8 +175,8 @@ function singleStep(){
 }
 function takeSample(){if(!split)return;const result=M.sample(pop,s,observe),detected=result.p<=.05;if(lastSampleGen!==pop.generation){sampleResults=[];lastSampleGen=pop.generation;}sampleResults.push(detected);$('sample-generation').textContent='GEN '+pop.generation;$('sample-result').className='sample-result '+(detected?'detected':'missed');$('sample-result').innerHTML=`<span class="sample-icon">${detected?'✓':'≈'}</span><strong>${detected?'Difference detected':'No difference detected'}</strong><p>p ${result.p<.0001?'< 0.0001':'= '+result.p.toFixed(4)} · sampled FST ${result.fst.toFixed(4)}<br>${detected?'This sample supports genetic differentiation.':s.m?'A non-significant test does not establish panmixia.':'The populations are isolated; this sample does not reveal it.'}</p>`;$('sample-history').textContent=`At generation ${pop.generation}: ${sampleResults.filter(Boolean).length} of ${sampleResults.length} samples detected a difference. The power curve repeats this sampling ${number(s.studies)} times at each generation.`;$('take-sample').innerHTML='Sample again <span>→</span>';}
 function resize(){ocean.resize();if(s)drawScene();}
-function drawScene(){ocean.draw({split,paused,generation:pop.generation,m:s.m,generationRate:running?Number($('speed').value):0,p1:pop.a,p2:pop.b,markers:$('show-markers').checked});$('meet-shark').setAttribute('aria-pressed',String(ocean.selected>=0));}
-function advanceClock(now){const dt=last?Math.min(.1,(now-last)/1000):0;last=now;if(running){accumulator=Math.min(1,accumulator+dt*(+$('speed').value));if(accumulator>=1&&worker&&completedThrough>=pop.generation){accumulator=0;step();sync();}}}
+function drawScene(){if(!oceanVisible)return;ocean.draw({split,paused,generation:pop.generation,m:s.m,generationRate:running?Number($('speed').value):0,p1:pop.a,p2:pop.b,markers:$('show-markers').checked});$('meet-shark').setAttribute('aria-pressed',String(ocean.selected>=0));}
+function advanceClock(now){const dt=last?Math.max(0,Math.min(.5,(now-last)/1000)):0;last=now;if(running){accumulator=Math.min(1,accumulator+dt*(+$('speed').value));if(accumulator>=1&&worker&&completedThrough>=pop.generation){accumulator=0;step();sync();}}}
 // Pause cancels the clocks themselves, rather than keeping a no-op frame loop alive.
 function stopClocks(){
   if(animationFrame!==null){cancelAnimationFrame(animationFrame);animationFrame=null;}
@@ -189,4 +189,10 @@ function backgroundTick(){backgroundTimer=null;if(document.hidden&&running){adva
 function ensureBackgroundClock(){if(document.hidden&&running&&backgroundTimer===null)backgroundTimer=setTimeout(backgroundTick,100);}
 
 $('shark-design').onchange=()=>{ocean.variant=$('shark-design').value;animalLabels();drawScene();};$('travel-speed').onchange=()=>{ocean.travelPace=Number($('travel-speed').value);};$('segregating-only').onchange=renderSnps;$('show-markers').onchange=drawScene;ocean.onInspect=()=>{if(paused)drawScene();};$('meet-shark').onclick=()=>{ocean.selected=ocean.selected<0?1:-1;drawScene();};$('split').onclick=startRun;$('play').onclick=togglePlayback;$('step').onclick=singleStep;$('reset').onclick=reset;$('take-sample').onclick=takeSample;$('calculate-power').onclick=togglePower;for(const id of ['total','ratio','migration','sample-size','loci'])$(id).addEventListener('change',reset);$('ratio').addEventListener('input',()=>$('ratio-out').textContent=$('ratio').value+'%');$('sample-size').addEventListener('input',()=>$('sample-out').textContent=$('sample-size').value);document.addEventListener('visibilitychange',()=>{stopClocks();scheduleFrame();ensureBackgroundClock();});new ResizeObserver(resize).observe(canvas);reset();resize();
+if(typeof IntersectionObserver==='function')new IntersectionObserver(entries=>{
+  const visible=entries.some(entry=>entry.isIntersecting);
+  if(visible===oceanVisible)return;oceanVisible=visible;
+  // Scrolling back never replays time spent offscreen; genetics kept running.
+  ocean.last=performance.now()/1000;if(visible)drawScene();
+},{rootMargin:'100px'}).observe(canvas);
 })();

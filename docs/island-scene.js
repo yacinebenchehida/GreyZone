@@ -87,12 +87,29 @@ class IslandScene{
     for(const [dx,dy]of [[-3,4],[3,5],[0,-1]]){const coconut=c.createRadialGradient(dx-1,dy-1,.4,dx,dy,3.7);coconut.addColorStop(0,'#c19b59');coconut.addColorStop(1,'#6e5635');c.fillStyle=coconut;c.beginPath();c.arc(dx,dy,3.5,0,TAU);c.fill();}
     c.restore();
   }
-  draw(scene,state,progress){
+  render(scene,state,progress){
     const p=clamp(progress,0,1),g=smooth(.08,.94,p);scene.c.drawImage(this.base(scene,state,p,g),0,0,scene.w,scene.h);this.surf(scene,state,p,g);
     const grow=smooth(.38,.96,p),y=scene.h*.265,co=scene.coast(y,g);
     this.palm(scene.c,co.x+co.half*.08,y,clamp(scene.w/930,.6,1.08),scene.clock,grow);
     if(scene.w>650){const yy=scene.h*.815,co2=scene.coast(yy,g);this.palm(scene.c,co2.x-co2.half*.12,yy,.56,scene.clock+.9,smooth(.55,1,p));}
   }
+  draw(scene,state,progress){
+    if(scene.detail!=='lite'){this.render(scene,state,progress);return;}
+    // Surf and palm sway are subtle: cache their complete decorative layer at
+    // eight frames per second instead of rebuilding every leaflet each frame.
+    const tick=Math.floor(scene.clock*8),key=[scene.w,scene.h,scene.dpr,state.m,tick,progress===1].join('|');
+    if(this.lightLayer?.key!==key){
+      let image=this.lightLayer?.image;
+      if(!image||image.width!==Math.round(scene.w*scene.dpr)||image.height!==Math.round(scene.h*scene.dpr)){
+        image=document.createElement('canvas');image.width=Math.round(scene.w*scene.dpr);image.height=Math.round(scene.h*scene.dpr);
+      }
+      const c=image.getContext('2d');c.setTransform(scene.dpr,0,0,scene.dpr,0,0);c.clearRect(0,0,scene.w,scene.h);
+      const layer=Object.create(scene);layer.c=c;layer.clock=tick/8;
+      this.render(layer,state,progress);this.lightLayer={key,image};
+    }
+    scene.c.drawImage(this.lightLayer.image,0,0,scene.w,scene.h);
+  }
+
 }
 root.IslandScene=IslandScene;
 })(globalThis);
