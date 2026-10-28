@@ -140,7 +140,7 @@ class OceanScene{
       c.fillStyle='#173e46';c.font='bold 17px Arial, sans-serif';c.fillText(String(dose),cx+10,cy+37);
       c.font='9px Arial, sans-serif';c.fillText(['B/B','A/B','A/A'][dose],cx,cy+49);
     }
-    c.fillStyle='#72877f';c.font='9px Arial, sans-serif';c.fillText(`${indices.length} of ${state.p1.length} SNPs · click the shark to close`,x,y+h-10);c.restore();
+    c.fillStyle='#72877f';c.font='9px Arial, sans-serif';c.fillText(`${indices.length} of ${state.p1.length} SNPs`,x,y+h-24);c.fillText(`Click the ${SeaLife.info(this.variant).singular} again to close this panel.`,x,y+h-10);c.restore();
   }
 
   draw(state){
