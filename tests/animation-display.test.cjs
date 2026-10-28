@@ -66,18 +66,25 @@ test('unchanged frequencies keep identical dots, fixation has no mixed colours, 
 });
 
 
-test('fixed SNP colours align across loci in west, opposite fixation contrasts in east, and shared fixation is gold',()=>{
+test('fixed SNP colours align across loci in west, opposite fixation contrasts in east, and shared fixation is grey',()=>{
   const frequencies=[[0,1,0,1],[1,0,0,1]],reference=[],indices=[0,1,2,3];
   const styles=D.markerPalettes(frequencies,indices,reference);
   for(let i=0;i<2;i++){
     assert.equal(styles[i].colors[frequencies[0][i]],'#29d1be');
     assert.equal(styles[i].colors[frequencies[1][i]],'#f6a183');
   }
-  for(let i=2;i<4;i++){assert(styles[i].sharedFixed);assert.equal(styles[i].colors[0],styles[i].colors[1]);assert.equal(styles[i].colors[0],'#e5b344');}
+  for(let i=2;i<4;i++){assert(styles[i].sharedFixed);assert.equal(styles[i].colors[0],styles[i].colors[1]);assert.equal(styles[i].colors[0],'#aab0b2');}
   // Reintroduction returns the locus to the clearly different variable palette.
   const later=D.markerPalettes([[.1,.9,.1,.9],[.9,.1,.1,.9]],indices);
-  for(const style of later){assert.equal(style.state,'segregating');assert.deepEqual(Array.from(style.colors),['#7257b5','#d8c6f0']);assert(!style.sharedFixed);}
+  for(const style of later){assert.equal(style.state,'segregating');assert.deepEqual(Array.from(style.colors),['#f4c98b','#f4c98b']);assert(!style.sharedFixed);}
   const oneSideVariable=D.markerPalettes([[0,1],[.1,.9]],[0,1]);
   for(const style of oneSideVariable)assert.equal(style.state,'segregating');
   assert.equal(M.fst(frequencies[0],frequencies[1]),1);
+});
+
+
+test('the SNP fill palette contains exactly the four agreed colours',()=>{
+  const styles=D.markerPalettes([[.5,0,1,0],[.5,0,0,1]],[0,1,2,3]);
+  const colours=new Set(styles.flatMap(s=>s.colors));assert.equal(colours.size,4);
+  assert.deepEqual([...colours].sort(),['#f4c98b','#aab0b2','#29d1be','#f6a183'].sort());
 });

@@ -21,9 +21,9 @@ function app(overrides={}){
   const world={Math,Number,document,crypto:{getRandomValues(value){value[0]=++seed;return value;}},setTimeout:fn=>{timers.set(++timerId,fn);return timerId;},clearTimeout:id=>timers.delete(id),Worker:class{
       constructor(){workers.push(this);this.points=[];}
       postMessage(data){
-        this.request=data;if(data.type==='init'){this.initialRequest=data;this.points=[{t:0,power:.05,hits:25}];}
+        this.request=data;if(data.type==='init'){this.initialRequest=data;this.points=[{t:data.population?.generation??0,power:.05,hits:25}];}
         if(data.type==='advance'){this.lastAdvance=data;this.points.push({t:data.generation,power:.05,hits:25});}
-        if(overrides.autoPower!==false&&(data.type==='init'||data.type==='advance'))this.onmessage({data:{id:data.id,max:data.generation??0,reps:500,points:this.points.map(p=>({...p}))}});
+        if(overrides.autoPower!==false&&(data.type==='init'||data.type==='advance'))this.onmessage({data:{id:data.id,max:data.population?.generation??data.generation??0,reps:500,points:this.points.map(p=>({...p}))}});
       }
       terminate(){this.terminated=true;}
     },devicePixelRatio:1,matchMedia:()=>({matches:false}),performance:{now:()=>time},
@@ -31,6 +31,8 @@ function app(overrides={}){
   vm.createContext(world);
   for(const name of ['model.js','population-display.js','swim-motion.js','shark-character.js','ocean-scene.js','power-result.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation',name),'utf8'),world);
   const Scene=world.OceanScene;world.OceanScene=class extends Scene{constructor(...args){super(...args);scene=this;}};
+  if(overrides.advanceOverride)world.GreyModel.advance=overrides.advanceOverride;
+  if(overrides.startGeneration!==undefined){const initial=world.GreyModel.initial;world.GreyModel.initial=s=>({...initial(s),generation:overrides.startGeneration});}
   vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation/app.js'),'utf8'),world);
   const tick=(n=1)=>{for(let i=0;i<n;i++){time+=1000/60;frame(time);}};
   const click=id=>{assert(!element(id).disabled,`${id} should be enabled`);element(id).onclick();};
@@ -53,14 +55,16 @@ test('Pause freezes generations, shark motion, body waves and the ocean clock; P
   a.tick(60);assert(Number(a.state().generation)>Number(paused.generation));assert.notEqual(a.state().animals,paused.animals);
 });
 
-test('single-step stays paused, a hidden tab pauses both clocks, and Reset restores the introductory swimming scene',()=>{
+test('single-step stays paused, changing tabs does not stop the run, and Reset restores the introductory sea',()=>{
   const a=app();a.tick();a.click('split');a.tick(60);
   a.click('step');const stepped=a.state();assert.equal(a.element('play').textContent,'Resume');
   a.tick(60);assert.deepEqual(a.state(),stepped);
   a.click('step');assert.equal(Number(a.state().generation),Number(stepped.generation)+1);
   assert.equal(a.state().animals,stepped.animals);
-  a.click('play');a.tick(10);a.visibility(true);a.tick(100);a.visibility(false);
-  const hidden=a.state();a.tick(60);assert.deepEqual(a.state(),hidden);
+  a.click('play');a.tick(10);const beforeHidden=Number(a.state().generation);a.visibility(true);
+  for(let i=0;i<10;i++){a.tick(30);a.runTimers();}
+  assert(Number(a.state().generation)>beforeHidden);assert.equal(a.element('play').textContent,'Pause');
+  a.visibility(false);const hiddenGeneration=Number(a.state().generation);a.tick(60);assert(Number(a.state().generation)>hiddenGeneration);
   a.click('reset');a.tick();const reset=a.state();assert.equal(Number(reset.generation),0);
   a.tick(20);assert(a.state().clock>reset.clock);assert.notEqual(a.state().animals,reset.animals);
 });
@@ -68,9 +72,9 @@ test('single-step stays paused, a hidden tab pauses both clocks, and Reset resto
 
 test('live power follows the clock, stays running after detection and reruns have fresh seeds',()=>{
   const a=app({autoPower:false});assert.equal(a.workers.length,0);a.click('split');const w=a.workers[0],id=w.request.id;
-  assert.equal(w.request.type,'init');assert.equal(typeof w.request.seed,'number');
+  assert.equal(w.request.type,'init');assert.equal(typeof w.request.seed,'number');assert.equal(w.request.population.generation,0);
   w.onmessage({data:{id,max:0,reps:500,points:[{t:0,power:.05,hits:25}]}});
-  a.click('step');assert.equal(w.request.type,'advance');assert.equal(w.request.generation,1);
+  a.click('step');assert.equal(w.request.type,'advance');assert.equal(w.request.generation,1);assert.equal(w.request.population.generation,1);
   w.onmessage({data:{id,max:1,points:[{t:0,power:.05,hits:25},{t:1,power:.6,hits:300}]}});
   assert.equal(a.element('power-time').textContent,'Not reached yet');
   a.click('step');
@@ -97,11 +101,12 @@ test('isolated 100-individual live history fixes the ten displayed SNPs and keep
   const a=app({total:100,loci:50,'sample-size':20});a.click('split');
   // Use the actual +1 handler to advance the real model without expensive decorative frames.
   const draw=a.scene.draw;a.scene.draw=()=>{};
-  for(let i=0;i<1600;i++)a.click('step');
+  for(let i=0;i<1600&&!a.element('step').disabled;i++)a.click('step');
   a.scene.draw=draw;
   a.element('show-markers').checked=true;a.tick();
   assert.match(a.element('sorting-status').textContent,/Fixed on both sides: 50\/50/);
-  assert.equal(a.element('fst-value').textContent,'FST 1.0000');
+  assert.equal(a.element('fst-value').textContent,'FST 1.0000');assert.equal(a.element('play').textContent,'Fixed');assert(a.element('play').disabled);
+  const fixed=a.state();a.tick(60);assert.deepEqual(a.state(),fixed);
   const cache=a.scene.markerCache;
   for(let dot=0;dot<10;dot++)for(const side of [0,1]){
     const sharks=a.scene.animals.filter(x=>x.side===side),expected=cache.data.get(sharks[0].id)[dot][0];
@@ -126,9 +131,9 @@ test('Pause freezes queued power results and both charts; Resume applies them wi
 });
 
 
-test('generation playback waits for each 500-history estimate while the sharks keep swimming',()=>{
+test('generation playback waits for each 500-study estimate while the sharks keep swimming',()=>{
   const a=app({total:20,autoPower:false});a.click('split');const w=a.workers[0],id=w.initialRequest.id;
-  assert.equal(w.initialRequest.settings.histories,500);
+  assert.equal(w.initialRequest.settings.studies,500);
   a.tick(120);assert.equal(Number(a.state().generation),0);
   w.onmessage({data:{id,max:0,reps:500,points:[{t:0,power:.05,hits:25}]}});
   a.tick(60);assert.equal(Number(a.state().generation),1);assert.equal(w.lastAdvance.generation,1);
@@ -137,4 +142,21 @@ test('generation playback waits for each 500-history estimate while the sharks k
   assert(a.element('step').disabled);
   w.onmessage({data:{id,max:1,reps:500,points:[{t:0,power:.05,hits:25},{t:1,power:.1,hits:50}]}});
   a.tick();assert.equal(Number(a.state().generation),2);a.tick(60);assert.equal(Number(a.state().generation),2);
+});
+
+
+test('automatic completion checks every numerical SNP and continues after the detection guide',()=>{
+  const a=app({total:20,loci:20,advanceOverride:(p,s)=>{
+    const a=Array(s.loci).fill(0),b=Array(s.loci).fill(1);if(p.generation<2){a[1]=.5;b[1]=.5;}
+    return {a,b,generation:p.generation+1};
+  }});a.click('split');a.click('step');assert.match(a.element('sorting-status').textContent,/19\/20/);assert(!a.element('play').disabled);
+  a.click('step');assert(!a.element('play').disabled);a.click('step');assert(a.element('play').disabled);assert.equal(a.element('play').textContent,'Fixed');assert.match(a.element('sorting-status').textContent,/20\/20/);
+});
+test('migration prevents a transient opposite fixation from ending the run',()=>{
+  const a=app({total:20,loci:5,migration:.01,advanceOverride:(p,s)=>({a:Array(s.loci).fill(0),b:Array(s.loci).fill(p.generation===0?1:0),generation:p.generation+1})});
+  a.click('split');a.click('step');assert(!a.element('play').disabled);a.click('step');assert(a.element('play').disabled);assert.equal(a.element('play').textContent,'Fixed');
+});
+test('a generation beyond the former 200000 limit remains runnable when SNPs still segregate',()=>{
+  const a=app({total:20,loci:5,startGeneration:200000});a.click('split');a.click('step');
+  assert.equal(Number(a.state().generation.replaceAll(',','')),200001);assert(!a.element('play').disabled);assert(!a.element('step').disabled);
 });

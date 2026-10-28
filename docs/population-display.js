@@ -27,8 +27,8 @@ function markerPalettes(frequencies,indices){
   return indices.map(locus=>{
     const west=frequencies[0][locus],east=frequencies[1][locus];
     const bothFixed=(west===0||west===1)&&(east===0||east===1);
-    if(!bothFixed)return {state:'segregating',sharedFixed:false,colors:['#7257b5','#d8c6f0']};
-    if(west===east)return {state:'shared-fixed',sharedFixed:true,colors:['#e5b344','#e5b344']};
+    if(!bothFixed)return {state:'segregating',sharedFixed:false,colors:['#f4c98b','#f4c98b']};
+    if(west===east)return {state:'shared-fixed',sharedFixed:true,colors:['#aab0b2','#aab0b2']};
     return {state:'opposite-fixed',westAllele:Boolean(west),sharedFixed:false,colors:west===1?['#f6a183','#29d1be']:['#29d1be','#f6a183']};
   });
 }

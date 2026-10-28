@@ -1,41 +1,47 @@
-// Match the main-page model version, including after a deployment or reload.
-importScripts('model.js?v=paced-histories-6');
+// Study resampling of the exact live population pair; no demographic simulation.
+importScripts('model.js?v=live-studies-7');
 let batch=null;
 onmessage=function(event){
   const message=event.data;
   if(message.type==='init'){
-    const {settings:s,id,seed}=message,M=GreyModel,reps=500,master=M.rng((Number(seed)>>>0)^0x49c1a72d);
-    if(!Number.isInteger(reps)||reps<1||reps>10000)throw new RangeError('History count must be an integer from 1 to 10000');
-    batch={s,id,seed,reps,lastProgress:0,target:0,generation:0,index:0,hits:0,points:[],first:null,scheduled:false,paused:false,pauseAtTarget:false,
-      histories:Array.from({length:reps},()=>({pop:M.initial(s),evolve:M.rng(Math.floor(master()*4294967296)),observe:M.rng(Math.floor(master()*4294967296))}))};
-    reportProgress(true);schedule();
-  }else if(message.type==='advance'&&batch&&message.id===batch.id){
-    batch.target=Math.max(batch.target,message.generation);batch.pauseAtTarget=Boolean(message.pauseAtTarget);batch.paused=false;if(batch.generation<=batch.target)schedule();
-  }else if(batch&&message.id===batch.id&&message.type==='pause'){batch.paused=true;}
-  else if(batch&&message.id===batch.id&&message.type==='resume'){batch.paused=false;batch.pauseAtTarget=false;if(batch.generation<=batch.target)schedule();}
-};
-function reportProgress(force=false){const b=batch,now=performance.now();if(force||now-b.lastProgress>150){b.lastProgress=now;postMessage({type:'progress',id:b.id,reps:b.reps,generation:b.generation,done:b.index});}}
-function schedule(){if(!batch.paused&&!batch.scheduled){batch.scheduled=true;setTimeout(work,0);}}
-function work(){
-  const b=batch,M=GreyModel,start=performance.now();b.scheduled=false;if(b.paused||b.generation>b.target)return;
-  while(true){
-    const h=b.histories[b.index];
-    while(h.pop.generation<b.generation){
-      h.pop=M.advance(h.pop,b.s,h.evolve);
-      if(performance.now()-start>12){reportProgress();schedule();return;}
-    }
-    if(M.sample(h.pop,b.s,h.observe).p<=.05)b.hits++;
-    b.index++;
-    if(b.index===b.reps){
-      const point={t:b.generation,power:b.hits/b.reps,hits:b.hits};b.points.push(point);
-      if(b.first===null&&point.t>0&&point.power>=.8)b.first=point.t;
-      const nullRate=b.points[0].power;
-      postMessage({id:b.id,seed:b.seed,reps:b.reps,generation:b.generation,max:b.generation,
-        points:b.points.map(p=>({...p})),first:b.first,nullRate,complete:false});
-      b.index=0;b.hits=0;
-      if(b.generation>=b.target){b.generation++;if(b.pauseAtTarget)b.paused=true;return;}
-      b.generation++;
-    }
-    if(performance.now()-start>12){reportProgress();schedule();return;}
+    batch={s:message.settings,id:message.id,seed:message.seed,reps:500,
+      observe:GreyModel.rng((Number(message.seed)>>>0)^0x49c1a72d),
+      points:[],first:null,task:null,scheduled:false,paused:false,lastProgress:0};
+    beginStudy(message.population,false);
+  }else if(batch&&message.id===batch.id){
+    if(message.type==='advance')beginStudy(message.population,Boolean(message.pauseAtTarget));
+    else if(message.type==='pause')batch.paused=true;
+    else if(message.type==='resume'){batch.paused=false;schedule();}
   }
+};
+function beginStudy(population,pauseAtTarget){
+  const b=batch;
+  if(!population||!Number.isInteger(population.generation)||population.generation<0||population.a?.length!==b.s.loci||population.b?.length!==b.s.loci)throw new Error('A complete live population is required for study resampling');
+  if(population.generation<=(b.points.at(-1)?.t??-1))return;
+  if(b.task)throw new Error('Finish the current generation before requesting another study');
+  b.task={population:{a:Array.from(population.a),b:Array.from(population.b),generation:population.generation},index:0,hits:0,fstSum:0,pauseAtTarget};
+  b.paused=false;reportProgress(true);schedule();
+}
+function reportProgress(force=false){
+  const b=batch,t=b.task,now=performance.now();
+  if(t&&(force||now-b.lastProgress>150)){b.lastProgress=now;postMessage({type:'progress',id:b.id,reps:b.reps,generation:t.population.generation,done:t.index});}
+}
+function schedule(){if(batch.task&&!batch.paused&&!batch.scheduled){batch.scheduled=true;setTimeout(work,0);}}
+function work(){
+  const b=batch,M=GreyModel,start=performance.now();b.scheduled=false;
+  if(b.paused||!b.task)return;
+  const t=b.task;
+  while(t.index<b.reps){
+    const sample=M.sample(t.population,b.s,b.observe);
+    if(sample.p<=.05)t.hits++;
+    t.fstSum+=sample.fst;t.index++;
+    if(t.index<b.reps&&performance.now()-start>12){reportProgress();schedule();return;}
+  }
+  const generation=t.population.generation,point={t:generation,power:t.hits/b.reps,hits:t.hits,populationFst:M.fst(t.population.a,t.population.b),sampleFstMean:t.fstSum/b.reps};
+  b.points.push(point);
+  if(b.first===null&&generation>0&&point.power>=.8)b.first=generation;
+  // Bound the display history while preserving the initial calibration and first crossing.
+  if(b.points.length>2000)b.points=b.points.filter((p,i)=>i%2===0||p.t===b.first||i===b.points.length-1);
+  b.task=null;if(t.pauseAtTarget)b.paused=true;
+  postMessage({id:b.id,seed:b.seed,reps:b.reps,generation,max:generation,points:b.points.map(p=>({...p})),first:b.first,nullRate:b.points[0].power,complete:false});
 }

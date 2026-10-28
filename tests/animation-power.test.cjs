@@ -1,47 +1,53 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+const M=require('../animation/model.js'),settings={total:2000,ratio:50,m:0,sample:40,loci:50};
 const context={Math};vm.createContext(context);vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation/power-result.js'),'utf8'),context);const P=context.PowerResult;
-function batch(seed,settings,target=0){
-  const messages=[],tasks=[],world={Math,Number,performance:{now:()=>0},setTimeout(fn){tasks.push(fn);},importScripts(url){assert.equal(url,'model.js?v=paced-histories-6');},postMessage(data){messages.push(JSON.parse(JSON.stringify(data)));}};
-  vm.createContext(world);for(const name of ['model.js','power-worker.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation',name),'utf8'),world);
+function studies(seed,s,population,{clock=()=>0,autoDrain=true}={}){
+  const messages=[],tasks=[],world={Math,Number,performance:{now:clock},setTimeout(fn){tasks.push(fn);},importScripts(url){assert.equal(url,'model.js?v=live-studies-7');},postMessage(data){messages.push(JSON.parse(JSON.stringify(data)));}};
+  vm.createContext(world);vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation/model.js'),'utf8'),world);
+  // The sampling worker must never initialise or evolve its own population.
+  world.GreyModel.initial=()=>{throw Error('Independent population initialisation is forbidden');};
+  world.GreyModel.advance=()=>{throw Error('Independent population evolution is forbidden');};
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation/power-worker.js'),'utf8'),world);
   const drain=()=>{let guard=0;while(tasks.length){assert(guard++<10000);tasks.shift()();}};
-  world.onmessage({data:{type:'init',id:91,seed,settings}});drain();
-  const advance=g=>{world.onmessage({data:{type:'advance',id:91,generation:g}});drain();};
-  if(target)advance(target);return {messages,advance,send(message){world.onmessage({data:{id:91,...message}});},drain};
+  const send=message=>world.onmessage({data:{id:91,...message}});
+  send({type:'init',settings:s,population,seed});if(autoDrain)drain();
+  return {messages,send,drain,runOne(){tasks.shift()?.();},advance(pop,pauseAtTarget=false){send({type:'advance',population:pop,pauseAtTarget});drain();}};
 }
-test('status follows checked live points, remembers the first 80% crossing and does not extrapolate',()=>{
-  assert.equal(P.summary(null).status,'pending');
-  assert.equal(P.summary({points:[{t:0,power:.05},{t:1,power:.6}]}).status,'not-yet');
-  const points=[{t:0,power:.05},{t:1,power:.85},{t:2,power:.75},{t:3,power:.9}];
-  assert.equal(P.summary({points}).generation,1);assert.equal(P.at(points,2),.75);assert.equal(P.at(points,4),null);
+test('status remembers the first live-history crossing, flags poor null calibration and never extrapolates',()=>{
+  const points=[{t:0,power:.05},{t:1,power:.85},{t:2,power:.65},{t:3,power:.9}];
+  assert.equal(P.summary({points}).generation,1);assert.equal(P.at(points,2),.65);assert.equal(P.at(points,4),null);
   assert.equal(P.summary({points:[{t:0,power:.2}]}).status,'uncalibrated');
 });
-test('worker follows the requested clock only, continues after crossing, ignores stale requests, and new seeds vary the curves',()=>{
-  const s={total:100,ratio:50,m:0,sample:20,loci:50},a=batch(123,s),b=batch(456,s,10);
-  assert.equal(a.messages.at(-1).max,0);a.advance(10);assert.equal(a.messages.at(-1).max,10);
-  assert(a.messages.at(-1).first>0&&a.messages.at(-1).first<10);
-  const length=a.messages.length;a.advance(5);assert.equal(a.messages.length,length);
-  assert.notEqual(JSON.stringify(a.messages.at(-1).points),JSON.stringify(b.messages.at(-1).points));
-  assert.equal(JSON.stringify(batch(123,s,10).messages.at(-1).points),JSON.stringify(a.messages.at(-1).points));
+test('all 500 studies use the supplied live frequencies; the worker never runs another population history',()=>{
+  const s={...settings,loci:20},initial=M.initial(s),before=JSON.stringify(initial),run=studies(123,s,initial);
+  let data=run.messages.at(-1);assert.equal(data.reps,500);assert.equal(data.max,0);assert.equal(data.points[0].populationFst,0);assert.equal(JSON.stringify(initial),before);
+  const separated={a:Array(20).fill(1),b:Array(20).fill(0),generation:1};run.advance(separated);
+  data=run.messages.at(-1);assert.equal(data.points.at(-1).populationFst,1);assert.equal(data.points.at(-1).power,1);assert.equal(data.points.at(-1).sampleFstMean,1);
+  const identical={a:Array(20).fill(.5),b:Array(20).fill(.5),generation:2};run.advance(identical);
+  data=run.messages.at(-1);assert.equal(data.points.at(-1).populationFst,0);assert(data.points.at(-1).power<.12);assert.equal(data.first,1);
+  for(const p of data.points)assert.equal(p.power,p.hits/500);
+  const length=run.messages.length;run.advance(identical);assert.equal(run.messages.length,length);
 });
-test('100 individuals and no flow does not absorb at generation one; detection and FST continue normally',()=>{
-  const s={total:100,ratio:50,m:0,sample:20,loci:50},run=batch(123,s,20),points=run.messages.at(-1).points;
-  assert(points[1].power>0&&points[1].power<1);assert(points.at(-1).power>=.8);assert(points.length===21);
+test('fixed seed and live trajectory reproduce results; fresh study seeds change sampling outcomes',()=>{
+  const p=M.initial(settings),a=studies(123,settings,p).messages.at(-1),b=studies(456,settings,p).messages.at(-1);
+  assert.notEqual(JSON.stringify(a.points),JSON.stringify(b.points));
+  assert.equal(JSON.stringify(a.points),JSON.stringify(studies(123,settings,p).messages.at(-1).points));
 });
-
-
-test('the worker stops pending calculation on Pause, resumes the same batch, and supports paused single steps',()=>{
-  const s={total:100,ratio:50,m:0,sample:20,loci:50},a=batch(123,s);
-  a.send({type:'advance',generation:5});a.send({type:'pause'});a.drain();assert.equal(a.messages.at(-1).max,0);
-  a.send({type:'resume'});a.drain();assert.equal(a.messages.at(-1).max,5);
-  assert.equal(JSON.stringify(a.messages.at(-1).points),JSON.stringify(batch(123,s,5).messages.at(-1).points));
-  a.send({type:'pause'});a.send({type:'advance',generation:6,pauseAtTarget:true});a.drain();assert.equal(a.messages.at(-1).max,6);
-  const count=a.messages.length;a.drain();assert.equal(a.messages.length,count);
+test('Pause preserves an unfinished 500-study calculation and Resume reproduces uninterrupted results',()=>{
+  let time=0;const p=M.initial(settings),run=studies(123,settings,p,{clock:()=>++time,autoDrain:false});
+  run.runOne();run.send({type:'pause'});run.drain();assert(!run.messages.some(x=>x.points));
+  run.send({type:'resume'});run.drain();const expected=studies(123,settings,p).messages.at(-1);
+  assert.equal(JSON.stringify(run.messages.at(-1).points),JSON.stringify(expected.points));
+  run.advance({...p,generation:1},true);assert.equal(run.messages.at(-1).max,1);
 });
-
-
-test('each completed generation evaluates exactly 500 histories, with power equal to hits / 500',()=>{
-  const run=batch(732,{total:40,ratio:50,m:0,sample:10,loci:5},3),data=run.messages.at(-1);
-  assert.equal(data.reps,500);assert.equal(data.points.length,4);
-  for(const point of data.points){assert.equal(point.power,point.hits/500);assert(Number.isInteger(point.hits));assert(point.hits>=0&&point.hits<=500);}
-  assert(run.messages.some(x=>x.type==='progress'&&x.reps===500));
+test('population input is copied and all selected SNPs are used even above the ten-dot display limit',()=>{
+  const s={...settings,loci:50},p={a:Array(50).fill(.5),b:Array(50).fill(.5),generation:0};
+  // The first 10 SNPs match; the remaining 40 are diagnostic.
+  for(let i=10;i<50;i++){p.a[i]=1;p.b[i]=0;}
+  const expected=M.fst(p.a,p.b),run=studies(91,s,p,{autoDrain:false});p.a.fill(0);p.b.fill(0);run.drain();
+  const point=run.messages.at(-1).points[0];assert.equal(point.populationFst,expected);assert.equal(point.power,1);
+});
+test('generation-zero rejection remains near 5% across repeated study batches of identical populations',()=>{
+  let hits=0;for(let seed=1;seed<=10;seed++)hits+=studies(seed,settings,M.initial(settings)).messages.at(-1).points[0].hits;
+  assert(hits/5000>.03&&hits/5000<.07);
 });
