@@ -10,7 +10,7 @@ class AnimalPoseCache{
     const rate=rates[kind]||1,phase=((animal.stroke||0)*rate%TAU+TAU)%TAU;
     const p=Math.round(phase/TAU*phases)%phases;
     const b=Math.round((Math.max(-.72,Math.min(.72,animal.bend||0))+.72)/1.44*(bends-1));
-    return {key:p+':'+b,stroke:p/phases*TAU/rate,bend:-.72+b/(bends-1)*1.44,effort:.85,phase:0};
+    return {key:p+':'+b+(kind==='whale'&&CetaceanCharacter.textured()?':skin':''),stroke:p/phases*TAU/rate,bend:-.72+b/(bends-1)*1.44,effort:.85,phase:0};
   }
   draw(c,animal,time,options){
     const kind=options.variant||'hammer';

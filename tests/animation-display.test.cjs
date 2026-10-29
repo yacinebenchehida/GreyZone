@@ -17,7 +17,8 @@ test('headcounts are exact up to 200, then increase gently while preserving the 
       assert(Math.abs(d.west/d.total-ratio/100)<=.5/d.total+1e-12);
     }
   }
-  assert(D.count(500000)<450,'The largest current setting must remain practical to draw');
+  for(const [total,shown]of [[1000,305],[10000,455],[100000,605],[500000,700]])assert.equal(D.count(total),shown);
+  assert(D.count(500000)===700,'The largest current setting must remain practical to draw');
 });
 
 test('each animal has one diploid dot per displayed SNP, capped at ten; fixed alleles and current frequencies are retained',()=>{

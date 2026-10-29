@@ -10,7 +10,7 @@ const catalogue={
   surgeon:{name:'Blue tang',singular:'blue tang',plural:'blue tangs',portrait:1},
   tuna:{name:'Tuna',singular:'tuna',plural:'tuna',portrait:1},
   orca:{name:'Orca',singular:'orca',plural:'orcas',portrait:.9},
-  whale:{name:'Humpback whale',singular:'humpback whale',plural:'humpback whales',portrait:.80},
+  whale:{name:'Fin whale',singular:'fin whale',plural:'fin whales',portrait:.80},
   porpoise:{name:'Harbour porpoise',singular:'harbour porpoise',plural:'harbour porpoises',portrait:1},
   seal:{name:'Harbour seal',singular:'seal',plural:'seals',portrait:1}
 };

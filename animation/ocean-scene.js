@@ -93,7 +93,7 @@ class OceanScene{
       a.x=clamp(a.x,18/w,1-18/w);
     }
   }
-  actorScale(a){return a.size*clamp(this.w/1750,.30,.60)*Math.min(1,Math.sqrt(72/this.animals.length));}
+  actorScale(a){return a.size*clamp(this.w/1750,.30,.60)*Math.min(1,Math.sqrt(72/Math.min(400,this.animals.length)));}
   waterBounds(y,a,split){
     const pad=Math.max(46,118*this.actorScale(a));
     if(!split)return[pad,this.w-pad];

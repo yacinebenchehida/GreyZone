@@ -40,3 +40,13 @@ test('the requested display copy is absent and the hammerhead remains the defaul
   for(const phrase of ['Genetic evidence can lag behind life','INTERACTIVE DRAFT','A SMALL EXPERIMENT IN POPULATION GENETICS','A sea apart','Background:','Bailleul','Ben Chehida','Schleimer'])assert(!html.includes(phrase),phrase);
   const source=fs.readFileSync(path.join(__dirname,'../animation/index.html'),'utf8');assert.match(source,/<option value="hammer" selected>/);
 });
+
+test('fin whale detailed skin follows curved poses and replaces pre-load cached artwork',()=>{
+  let image;world.Image=class{constructor(){image=this;this.complete=false;this.naturalWidth=0;}};
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation/cetacean-character.js'),'utf8'),world);
+  const cache=new world.AnimalPoseCache(),animal={x:200,y:100,heading:.7,scale:.5,stroke:1.2,bend:.3,phase:0};
+  cache.draw(draw.ctx,animal,.6,{variant:'whale'});assert.equal(cache.images.size,1);assert(!world.CetaceanCharacter.textured());
+  image.complete=true;image.naturalWidth=2152;assert(world.CetaceanCharacter.textured());
+  cache.draw(draw.ctx,animal,.6,{variant:'whale'});assert.equal(cache.images.size,2,'The loaded detailed skin needs its own pose key');
+  for(const bend of [-.72,0,.72])for(const stroke of [0,2,5]){world.SeaLife.draw(draw.ctx,{...animal,bend,stroke},.6,{variant:'whale'});assert.equal(draw.depth,0);}
+});

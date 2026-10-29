@@ -2,7 +2,7 @@
    This changes the illustration only; GreyModel remains authoritative. */
 (function(root){
 'use strict';
-function count(total){return total<=200?Math.max(1,Math.round(total)):Math.round(200+60*Math.log10(total/200));}
+function count(total){return total<=200?Math.max(1,Math.round(total)):Math.min(700,Math.round(200+150*Math.log10(total/200)));}
 function summary(settings){
   const total=count(settings.total),west=Math.round(total*settings.ratio/100);
   return {total,west,east:total-west,weight:settings.total/total,exact:settings.total<=200};
