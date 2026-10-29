@@ -43,7 +43,7 @@ class OceanScene{
   }
   update(dt,state){
     if(this.reduced.matches)return;
-    const w=this.w,h=this.h,gap=this.gap(),animals=this.animals,pace=this.travelPace;
+    const w=this.w,h=this.h,gap=this.gap(),animals=this.animals,pace=this.travelPace,whale=this.variant==='whale';
     if(state.split&&this.clock-this.raised>1.7&&this.clock>=this.nextMigration){
       const rate=GreyDisplay.migrationRate(this.settings,state.generationRate||0);
       this.migrationBudget=Math.min(1,this.migrationBudget+rate*dt);
@@ -60,9 +60,16 @@ class OceanScene{
     for(const a of animals){const key=Math.floor(a.x*w/cell)+','+Math.floor(a.y*h/cell);if(!grid.has(key))grid.set(key,[]);grid.get(key).push({id:a.id,side:a.side,x:a.x*w,y:a.y*h,cross:!!a.cross,settle:!!a.settle});}
     for(const a of animals){
       const x=a.x*w,y=a.y*h,scale=this.actorScale(a),pad=Math.max(46,118*scale),yMin=Math.max(55,pad),yMax=h-Math.max(45,pad),boundsAt=yy=>this.waterBounds(yy,a,state.split);
-      a.effort=.7+.25*(.5+.5*Math.sin(this.clock*.45+a.phase));a.stroke+=dt*(4.5+a.effort*1.8);
-      if(a.settle){const q=a.settle;q.elapsed+=dt;const u=clamp(q.elapsed/1.45,0,1),ease=u*u*(3-2*u);a.x=q.from+(q.to-q.from)*ease;FreeSwim.steer(a,q.to>q.from?0:Math.PI,dt);SharkCharacter.followTurn(a,dt,scale,a.speed*w*pace);if(u>=1)a.settle=null;continue;}
-      const target=FreeSwim.goal(a,{x,y,speed:a.speed*w*pace,time:this.clock,random:this.random,bounds:boundsAt,yMin,yMax});
+      let cruise=a.speed*w*pace;
+      if(whale)cruise=CetaceanCharacter.propel(a,dt,cruise,pace);
+      else{a.effort=.7+.25*(.5+.5*Math.sin(this.clock*.45+a.phase));a.stroke+=dt*(4.5+a.effort*1.8);}
+      if(a.settle){
+        const q=a.settle;q.elapsed+=dt;const u=clamp(q.elapsed/1.45,0,1),ease=u*u*(3-2*u);a.x=q.from+(q.to-q.from)*ease;
+        if(whale){const limits=boundsAt(y);CetaceanCharacter.steer(a,q.to>q.from?0:Math.PI,dt,cruise,211*scale,Math.min(limits[1]-limits[0],yMax-yMin));}
+        else{FreeSwim.steer(a,q.to>q.from?0:Math.PI,dt);SharkCharacter.followTurn(a,dt,scale,a.speed*w*pace);}
+        if(u>=1)a.settle=null;continue;
+      }
+      const target=FreeSwim.goal(a,{x,y,speed:cruise,time:this.clock,random:this.random,bounds:boundsAt,yMin,yMax});
       let tx=target.x,ty=target.y;
       let fx=0,fy=0;
       const gx=Math.floor(x/cell),gy=Math.floor(y/cell),spacing=70*scale;
@@ -71,7 +78,7 @@ class OceanScene{
         const dx=x-b.x,dy=y-b.y,d=Math.hypot(dx,dy);
         if(d>0&&d<spacing){const force=(spacing-d)/spacing;fx+=dx/d*force*.65;fy+=dy/d*force*.65;}
       }
-      let desired=Math.atan2(ty-y,tx-x),speed=a.speed*w*pace;
+      let desired=Math.atan2(ty-y,tx-x),speed=cruise;
       if(a.cross){
         const sign=a.cross.side?1:-1,coast=this.coast(gap.y),clearance=Math.max(58,pad+12),entry=coast.x-sign*(coast.half+clearance),exit=coast.x+sign*(coast.half+clearance);
         ty=gap.y;
@@ -79,13 +86,22 @@ class OceanScene{
         if(a.cross.stage===1){speed*=1.2;tx=exit;if(sign*(x-exit)>-7){a.side=a.cross.side;a.cross=null;a.wanderTarget=null;this.markerCache=null;}}
         desired=Math.atan2(ty-y,tx-x);
       }else{
-        const wall=FreeSwim.avoid({x,y,heading:a.heading,speed,bounds:boundsAt,yMin,yMax});
+        const wall=(whale?CetaceanCharacter:FreeSwim).avoid({x,y,heading:a.heading,speed,bounds:boundsAt,yMin,yMax,bodyLength:211*scale});
         fx+=wall.x;fy+=wall.y;
         desired=Math.atan2(Math.sin(desired)+fy,Math.cos(desired)+fx);
       }
-      FreeSwim.steer(a,desired,dt);
-      SharkCharacter.followTurn(a,dt,scale,speed);
-      // Body-wave cadence is independent of travel speed.
+      if(whale){
+        const limits=boundsAt(y),span=Math.min(limits[1]-limits[0],yMax-yMin);
+        CetaceanCharacter.steer(a,desired,dt,speed,211*scale,span);
+        if(!a.cross){
+          // Ease forward momentum before a tight coastal turn, giving the
+          // slower angular response room to finish without pinning at a wall.
+          const dx=Math.cos(a.heading),dy=Math.sin(a.heading);
+          const clearance=Math.min((dx<0?x-limits[0]:limits[1]-x)/Math.max(.05,Math.abs(dx)),(dy<0?y-yMin:yMax-y)/Math.max(.05,Math.abs(dy)));
+          speed*=.28+.72*clamp(clearance/(speed*2.8+211*scale*.35),0,1);
+        }
+      }else{FreeSwim.steer(a,desired,dt);SharkCharacter.followTurn(a,dt,scale,speed);}
+      // Whales coast between strokes; the accepted shark cadence stays unchanged.
       a.x+=Math.cos(a.heading)*speed*dt/w;a.y+=Math.sin(a.heading)*speed*dt/h;
       a.y=clamp(a.y,yMin/h,yMax/h);
       if(a.cross&&a.cross.stage===1){a.y=clamp(a.y,(gap.y-gap.half+12)/h,(gap.y+gap.half-12)/h);}

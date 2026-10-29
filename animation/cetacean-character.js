@@ -2,31 +2,74 @@
    Flukes beat vertically, expressed by foreshortening, rather than a fish-like sideways wag. */
 (function(root){
 'use strict';
-const TAU=Math.PI*2;
+const TAU=Math.PI*2,clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
+const smooth=x=>{x=clamp(x);return x*x*(3-2*x);};
+// Compressed dive cycles keep representatives visible underwater. The head
+// breaks the surface before the back; blows occur only in that surface window.
+function appearance(a,time){
+  const period=58+(a.phase||0)*1.7,t=((time+(a.phase||0)*9)%period+period)%period;
+  const presence=u=>smooth((t-u*1.15)/1.6)*(1-smooth((t-17-u*1.8)/2.7));
+  const breath=[2.5,8.2,13.9].find(start=>t>=start&&t<start+1.9);
+  const arch=Math.sin(Math.PI*clamp((t-16.5)/5.3));
+  return {t,breath:breath===undefined?-1:(t-breath)/1.9,
+    opacity:u=>.20+.80*presence(u),length:1-.035*arch,shallow:presence(.3)};
+}
+// Three complete vertical strokes ease into a glide. Forward momentum decays
+// gradually, rather than stopping when the tail rests. This affects whales only.
+function propel(a,dt,base,pace){
+  a.whaleTime=(a.whaleTime??(a.phase||0)*3)+dt*Math.sqrt(pace/.95);
+  const q=a.whaleTime%10.5,s=clamp(q/6.3),drive=q<6.3?4*s*(1-s):0;
+  a.stroke=TAU*3*smooth(s)/.29;
+  a.effort=.45+.55*drive;
+  const target=.72+.34*drive;
+  a.whaleSpeed=(a.whaleSpeed??target)+(target-(a.whaleSpeed??target))*(1-Math.exp(-dt/1.6));
+  return base*a.whaleSpeed;
+}
+function steer(a,desired,dt,speed,bodyLength,span){
+  const error=Math.atan2(Math.sin(desired-a.heading),Math.cos(desired-a.heading));
+  const maxRate=clamp(speed/Math.max(12,Math.min(bodyLength*.85,span*.24)),.35,1.35);
+  const wanted=clamp(error*1.3,-maxRate,maxRate),previous=a.turnRate||0;
+  a.turnRate=previous+clamp((wanted-previous)*(1-Math.exp(-dt/.45)),-dt*.9,dt*.9);
+  a.heading+=(previous+a.turnRate)*.5*dt;
+  const bend=clamp(a.turnRate*bodyLength/Math.max(8,speed)*.48,-.64,.64);
+  a.bend=(a.bend||0)+(bend-(a.bend||0))*(1-Math.exp(-dt/.36));
+  a.previousHeading=a.heading;
+}
+function avoid({x,y,heading,speed,bounds,yMin,yMax,bodyLength}){
+  const here=bounds(y),span=Math.min(here[1]-here[0],yMax-yMin);
+  const look=Math.min(speed*2.6+bodyLength*.3,Math.max(18,span*.62));
+  const px=x+Math.cos(heading)*look,py=y+Math.sin(heading)*look;
+  const limits=bounds(clamp(py,yMin,yMax)),pad=Math.min(12,span*.1),force=2.4/Math.max(12,look*.5);
+  return {x:(Math.max(0,limits[0]+pad-px)-Math.max(0,px-limits[1]+pad))*force,
+    y:(Math.max(0,yMin+pad-py)-Math.max(0,py-yMax+pad))*force};
+}
 let texture=null;
 function textured(){
   if(!texture&&typeof Image==='function'){texture=new Image();texture.decoding='async';texture.src='assets/atlas/fin-whale.webp?v=fin-whale-27';}
   return Boolean(texture&&texture.complete&&texture.naturalWidth);
 }
-function drawTexture(c,a,options){
-  const {at,basis,phase}=field(a,'whale'),sourceLeft=47,sourceWidth=2052,k=211/sourceWidth,strips=36;
-  c.save();c.translate(a.x,a.y);c.rotate(a.heading||0);c.scale(a.scale||1,a.scale||1);
+function drawTexture(c,a,time,options){
+  const {at,basis,stretch}=field(a,'whale'),view=appearance(a,time),sourceLeft=47,sourceWidth=2052,k=211/sourceWidth,strips=36;
+  c.save();c.translate(a.x,a.y);c.rotate(a.heading||0);c.scale((a.scale||1)*(options.skipDepth?1:view.length),a.scale||1);
   // Bend the detailed skin along the same spine as the fins, flukes and genotype markers.
   for(let i=0;i<strips;i++){
     const sx=sourceLeft+i*sourceWidth/strips,sw=sourceWidth/strips,x=-121+(i+.5)*211/strips,u=(90-x)/180,p=basis(u);
-    const tail=Math.max(0,Math.min(1,(u-.89)/.22)),foreshorten=1-tail*(.12+.12*Math.sin(phase));
-    c.save();c.translate(p.x,p.y);c.rotate(p.a);c.scale(1,foreshorten);
+    c.save();c.globalAlpha=(c.globalAlpha??1)*(options.skipDepth?1:view.opacity(u));c.translate(p.x,p.y);c.rotate(p.a);c.scale(stretch(u),1);
     c.drawImage(texture,sx,0,sw+1,731,-211/strips/2,-365.5*k,211/strips+k,731*k);c.restore();
   }
-  if(options.snps){const n=Math.min(10,options.snps.length),cols=Math.min(5,n);for(let i=0;i<n;i++){const p=at(cols===1?.4:.25+(i%cols)/(cols-1)*.35,n>5?(i<5?-5.5:5.5):0);SharkCharacter.drawMarker(c,p.x,p.y,4.3,options.snps[i],options.snpPalettes?.[i]);}}
+  if(options.snps){c.globalAlpha=(c.globalAlpha??1)*Math.max(.55,view.opacity(.4));const n=Math.min(10,options.snps.length),cols=Math.min(5,n);for(let i=0;i<n;i++){const p=at(cols===1?.4:.25+(i%cols)/(cols-1)*.35,n>5?(i<5?-5.5:5.5):0);SharkCharacter.drawMarker(c,p.x,p.y,4.3,options.snps[i],options.snpPalettes?.[i]);}}
   c.restore();
 }
 function field(a,kind){
   const whale=kind==='whale',phase=(a.stroke||0)*(whale?.29:.48),bend=a.bend||0;
-  const spine=u=>({x:(whale?90:63)-(whale?180:132)*u,y:bend*(whale?31:24)*u*u+Math.sin(phase-u*1.4)*u*u*.65});
+  // The flukes pitch about their transverse axis. Their fore-aft chord
+  // shortens in projection; the span does not flap sideways like a fish tail.
+  const projection=Math.cos(Math.sin(phase)*.48),stretch=u=>whale&&u>.87?projection:1;
+  const spine=u=>{let x=(whale?90:63)-(whale?180:132)*u;if(whale&&u>.87)x=-66.6+(x+66.6)*projection;
+    return {x,y:bend*(whale?31:24)*u*u+(whale?0:Math.sin(phase-u*1.4)*u*u*.65)};};
   const basis=u=>{const p=spine(u),q=spine(u+.002);return {...p,a:Math.atan2(p.y-q.y,p.x-q.x)};};
   const at=(u,offset=0)=>{const p=basis(u);return{x:p.x-Math.sin(p.a)*offset,y:p.y+Math.cos(p.a)*offset};};
-  return {phase,basis,at};
+  return {phase,basis,at,stretch};
 }
 function ellipse(c,x,y,rx,ry,color,angle=0){c.fillStyle=color;c.beginPath();c.ellipse(x,y,rx,ry,angle,0,TAU);c.fill();}
 function outline(c,at,widths){
@@ -37,9 +80,10 @@ function outline(c,at,widths){
   points.forEach((p,i)=>{const q=points[(i+1)%points.length];c.quadraticCurveTo(p.x,p.y,(p.x+q.x)/2,(p.y+q.y)/2);});c.closePath();
 }
 function draw(c,a,time,options){
-  if(options.variant==='whale'&&textured()){drawTexture(c,a,options);return;}
+  if(options.variant==='whale'&&textured()){drawTexture(c,a,time,options);return;}
   const whale=options.variant==='whale',{phase,basis,at}=field(a,options.variant);
   c.save();c.translate(a.x,a.y);c.rotate(a.heading||0);c.scale(a.scale||1,a.scale||1);c.lineJoin='round';
+  if(whale&&!options.skipDepth){const view=appearance(a,time);c.globalAlpha=(c.globalAlpha??1)*view.opacity(.4);c.scale(view.length,1);}
   // Fin-whale pectorals are short and narrow, swept back along the streamlined torso.
   for(const sign of [-1,1]){
     const p=basis(whale?.29:.32);c.save();c.translate(p.x,p.y);c.rotate(p.a+sign*Math.sin(phase-.4)*.035);c.scale(1,sign);
@@ -52,7 +96,7 @@ function draw(c,a,time,options){
   }
   // Broad bilateral flukes, swept leading edges and a distinct central trailing notch.
   const t=basis(1),span=whale?28:23,rear=whale?31:22;
-  c.save();c.translate(t.x,t.y);c.rotate(t.a);c.scale(1,.80+.17*Math.sin(phase));
+  c.save();c.translate(t.x,t.y);c.rotate(t.a);c.scale(whale?Math.cos(Math.sin(phase)*.48):1,whale?1:.80+.17*Math.sin(phase));
   const tail=c.createLinearGradient(3,-span,-rear,span);tail.addColorStop(0,'#536e78');tail.addColorStop(.55,'#2a4654');tail.addColorStop(1,'#6d858b');c.fillStyle=tail;c.strokeStyle='#294651';c.lineWidth=.8;
   c.beginPath();c.moveTo(5,-2);c.bezierCurveTo(-4,-5,-13,-span+3,-rear,-span);c.quadraticCurveTo(-rear+1,-span*.55,-rear+7,-span*.31);c.quadraticCurveTo(-rear+10,-3,-rear+5,0);c.quadraticCurveTo(-rear+10,3,-rear+7,span*.31);c.quadraticCurveTo(-rear+1,span*.55,-rear,span);c.bezierCurveTo(-13,span-3,-4,5,5,2);c.closePath();c.fill();c.stroke();
   c.strokeStyle='#a5bab766';c.lineWidth=.65;for(const sign of [-1,1]){c.beginPath();c.moveTo(-4,sign*3);c.quadraticCurveTo(-16,sign*14,-rear+3,sign*(span-4));c.stroke();}c.restore();
@@ -87,9 +131,19 @@ function draw(c,a,time,options){
   c.restore();
 }
 function surface(c,a,time,kind){
-  const whale=kind==='whale',{at}=field(a,kind),cycle=(time+(a.phase||0)*7)%(whale?21:15),duration=whale?1.9:.65;
-  if(cycle>duration)return;
-  const q=cycle/duration,p=at(whale?.19:.13),heading=a.heading||0,scale=a.scale||1;
+  const whale=kind==='whale',{at}=field(a,kind),view=whale?appearance(a,time):null;
+  const cycle=(time+(a.phase||0)*7)%15,duration=.65;
+  const q=whale?view.breath:cycle/duration;
+  const heading=a.heading||0,scale=a.scale||1;
+  if(whale&&view.shallow>.05){
+    // A restrained bow ripple and wake accompany the surface passage only.
+    c.save();c.translate(a.x,a.y);c.rotate(heading);c.scale(scale*view.length,scale);
+    c.strokeStyle=`rgba(225,253,245,${view.shallow*.25})`;c.lineWidth=.8;
+    for(const sign of [-1,1]){const p=at(.19,sign*6);c.beginPath();c.moveTo(p.x+8,p.y);c.bezierCurveTo(p.x-4,p.y+sign*8,p.x-27,p.y+sign*15,p.x-58,p.y+sign*17);c.stroke();}
+    c.restore();
+  }
+  if(q<0||q>1)return;
+  const p=at(whale?.19:.13);p.x*=whale?view.length:1;
   const x=a.x+(Math.cos(heading)*p.x-Math.sin(heading)*p.y)*scale,y=a.y+(Math.sin(heading)*p.x+Math.cos(heading)*p.y)*scale;
   c.save();c.translate(x,y);c.scale(scale,scale);
   c.strokeStyle=`rgba(232,253,247,${(1-q)*.35})`;c.lineWidth=.9;c.beginPath();c.ellipse(0,0,5+q*18,2.5+q*8,heading,0,TAU);c.stroke();
@@ -113,5 +167,22 @@ function surface(c,a,time,kind){
   }
   c.restore();
 }
-root.CetaceanCharacter={draw,field,surface,textured};
+// Cached bodies retain the same depth sequence without caching hundreds of
+// depth variants. Longitudinal bands reveal the head before the dorsal region.
+function cached(c,image,a,time){
+  const view=appearance(a,time),bands=18,sw=image.width/bands;
+  c.save();c.scale(view.length,1);
+  // Most frames are a level glide, either surfaced or submerged. Only the
+  // short transitions need bands, keeping lightweight whale rendering cheap.
+  if(view.opacity(-.22)===view.opacity(1.22)){
+    c.globalAlpha=(c.globalAlpha??1)*view.opacity(.4);c.drawImage(image,-128,-80,256,160);c.restore();return;
+  }
+  for(let i=0;i<bands;i++){
+    const x=-128+(i+.5)*256/bands,u=(90-x)/180;
+    c.save();c.globalAlpha=(c.globalAlpha??1)*view.opacity(u);
+    c.drawImage(image,i*sw,0,sw,image.height,-128+i*256/bands,-80,256/bands,160);c.restore();
+  }
+  c.restore();
+}
+root.CetaceanCharacter={draw,field,surface,textured,appearance,propel,steer,avoid,cached};
 })(globalThis);
