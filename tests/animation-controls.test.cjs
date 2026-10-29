@@ -148,7 +148,7 @@ test('generation playback waits for each 1000-study estimate while the sharks ke
   w.onmessage({data:{id,max:0,reps:1000,points:[{t:0,power:.05,hits:50}]}});
   a.tick(60);assert.equal(Number(a.state().generation),1);assert.equal(w.lastAdvance.generation,1);
   const before=a.state();a.tick(60);assert.equal(Number(a.state().generation),1);assert.notEqual(a.state().animals,before.animals);
-  w.onmessage({data:{type:'progress',id,generation:1,done:500,reps:1000}});assert.match(a.element('power-progress').textContent,/RUNNING · generation 1 · 1,000 study samples/);
+  w.onmessage({data:{type:'progress',id,generation:1,done:500,reps:1000}});assert.match(a.element('power-progress').textContent,/RUNNING · generation 1 · 1,000 simulated datasets/);
   assert(!a.element('step').disabled,'Step stays available while a generation is being sampled');
   w.onmessage({data:{id,max:1,reps:1000,points:[{t:0,power:.05,hits:50},{t:1,power:.1,hits:100}]}});
   a.tick();assert.equal(Number(a.state().generation),2);a.tick(60);assert.equal(Number(a.state().generation),2);
@@ -293,14 +293,14 @@ test('live status labels retain their nodes and +1 does not blink during resampl
   a.tick(60);assert.equal(Number(a.state().generation),1);assert(!a.element('step').disabled);
   for(const done of [0,100,500,999]){
     w.onmessage({data:{type:'progress',id,generation:1,done,reps:1000}});
-    assert.equal(a.element('power-progress').textContent,'RUNNING · generation 1 · 1,000 study samples');
-    assert.equal(a.element('power-now').textContent,'Generation 0: 50 / 1,000 studies detect differentiation (5.0%).');
+    assert.equal(a.element('power-progress').textContent,'RUNNING · generation 1 · 1,000 simulated datasets');
+    assert.equal(a.element('power-now').textContent,'Generation 0: 50 / 1,000 simulated datasets detect differentiation (5.0%).');
     assert(!a.element('step').disabled);
     a.element('power-progress').childNodes.forEach((node,i)=>assert.equal(node,progressNodes[i]));
     a.element('power-now').childNodes.forEach((node,i)=>assert.equal(node,resultNodes[i]));
   }
   w.onmessage({data:{id,max:1,points:[initial,{t:1,power:.996,hits:996}]}});
-  assert.equal(a.element('power-now').textContent,'Generation 1: 996 / 1,000 studies detect differentiation (99.6%).');
+  assert.equal(a.element('power-now').textContent,'Generation 1: 996 / 1,000 simulated datasets detect differentiation (99.6%).');
   a.element('power-now').childNodes.forEach((node,i)=>assert.equal(node,resultNodes[i]));
   a.click('reset');assert.equal(a.element('power-progress').textContent,'READY');a.click('split');assert.match(a.element('power-progress').textContent,/RUNNING/);
 });
@@ -419,4 +419,19 @@ test('both Pause buttons freeze whale propulsion, glide and breathing clocks in 
       a.click(button);a.tick(5);assert(a.scene.clock>paused.clock);assert(a.scene.animals[0].whaleTime>whaleTime);
     }
   }
+});
+
+
+test('quiet ocean FST and power values update from the live history and completed datasets, retaining their text nodes',()=>{
+  const a=app({total:100,autoPower:false});assert.equal(a.element('scene-fst').textContent,'0.0000');assert.equal(a.element('scene-power').textContent,'—');
+  const fstNode=a.element('scene-fst').firstChild;a.click('split');const w=a.workers[0],id=w.initialRequest.id;
+  w.onmessage({data:{id,max:0,points:[{t:0,power:.05,hits:50}]}});assert.equal(a.element('scene-power').textContent,'5.0%');
+  const powerNode=a.element('scene-power').firstChild;a.tick(60);assert.equal(Number(a.state().generation),1);
+  assert.equal(a.element('scene-fst').textContent,a.element('fst-value').textContent.slice(4));assert.equal(a.element('scene-fst').firstChild,fstNode);
+  assert.equal(a.element('scene-power').textContent,'5.0%');assert.match(a.element('scene-power').attributes.title,/generation 0/);
+  w.onmessage({data:{id,max:1,points:[{t:0,power:.05,hits:50},{t:1,power:.823,hits:823}]}});
+  assert.equal(a.element('scene-power').textContent,'82.3%');assert.equal(a.element('scene-power').firstChild,powerNode);assert.match(a.element('scene-power').attributes.title,/generation 1/);
+  a.click('play');const before=[a.element('scene-fst').textContent,a.element('scene-power').textContent];a.tick(120);
+  assert.deepEqual([a.element('scene-fst').textContent,a.element('scene-power').textContent],before);
+  a.click('reset');assert.equal(a.element('scene-power').textContent,'—');assert.equal(a.element('scene-fst').textContent,'0.0000');
 });

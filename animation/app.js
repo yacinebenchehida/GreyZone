@@ -45,13 +45,13 @@ function reset(seed){
   $('calculate-power').disabled=false;setText('calculate-power','Run simulation');$('power-progress').textContent='READY';
   setText('power-time','—');setText('power-scene-time','Choose settings, then Run simulation');
   setText('power-meaning','Choose Ne, m, sample size and SNP count. Watch the live run. Detection power is estimated at the same generations.');
-  setText('power-note',`${number(s.studies)} study samples of this live population pair follow the live clock. Evolution continues after detection.`);
-  $('power-design').textContent=`West Ne ${number(n1)} · east Ne ${number(n2)} · m ${s.m} · ${s.sample} sampled per side · ${s.loci} ${s.loci===1?'SNP':'SNPs'} · ${number(s.studies)} study samples`;
+  setText('power-note',`${number(s.studies)} simulated datasets of this live population pair follow the live clock. Evolution continues after detection.`);
+  $('power-design').textContent=`West Ne ${number(n1)} · east Ne ${number(n2)} · m ${s.m} · ${s.sample} sampled per side · ${s.loci} ${s.loci===1?'SNP':'SNPs'} · ${number(s.studies)} simulated datasets`;
   $('sample-generation').textContent='NOT SAMPLED';$('sample-result').className='sample-result';
   $('sample-result').innerHTML='<span class="sample-icon">?</span><strong>What would your study find?</strong><p>The barrier can be real even when the genetic test misses it.</p>';$('sample-history').textContent='';sync();scheduleFrame();
 }
 function startRun(){const seed=hasRun&&!$('seed-lock').checked?freshSeed():runSeed;reset(seed);hasRun=true;split=true;running=true;paused=false;$('split').textContent='Run again';$('take-sample').disabled=false;sync();calculatePower();}
-function sync(){const g=pop.generation;setText('generation',number(g));$('play').disabled=!split||finished;$('step').disabled=!split||finished||stepPowerTarget!==null;setText('play',finished?'Fixed':running?'Pause':'Resume');$('play').setAttribute('aria-pressed',String(paused));$('calculate-power').setAttribute('aria-pressed',String(paused));setText('phase',split?(s.m?'Two populations connected by migration.':'Demographically independent populations.'):'One connected population.');$('barrier-label').hidden=!split;$('channel-label').hidden=!split||!s.m;setText('fst-value','FST '+M.fst(pop.a,pop.b).toFixed(4));if(!split)setText('story','Choose Ne, m and your study design, then press Run simulation.');else if(!g)setText('story','The split has started. Both populations begin with identical allele frequencies.');else setText('story',s.m?`Generation ${g}: drift pulls the populations apart; migrants reconnect their gene pools.`:`Generation ${g}: no individuals cross. A genetic study may still miss the separation.`);if(finished)setText('story',`All ${s.loci} SNPs are fixed at generation ${number(g)}. Change the seed to explore another history.`);renderSnps();plotFst();plotPower();}
+function sync(){const g=pop.generation;setText('generation',number(g));$('play').disabled=!split||finished;$('step').disabled=!split||finished||stepPowerTarget!==null;setText('play',finished?'Fixed':running?'Pause':'Resume');$('play').setAttribute('aria-pressed',String(paused));$('calculate-power').setAttribute('aria-pressed',String(paused));setText('phase',split?(s.m?'Two populations connected by migration.':'Demographically independent populations.'):'One connected population.');$('barrier-label').hidden=!split;$('channel-label').hidden=!split||!s.m;setText('fst-value','FST '+M.fst(pop.a,pop.b).toFixed(4));setText('scene-fst',M.fst(pop.a,pop.b).toFixed(4));$('scene-fst').setAttribute('title','Population FST at generation '+number(g));if(!split)setText('story','Choose Ne, m and your study design, then press Run simulation.');else if(!g)setText('story','The split has started. Both populations begin with identical allele frequencies.');else setText('story',s.m?`Generation ${g}: drift pulls the populations apart; migrants reconnect their gene pools.`:`Generation ${g}: no individuals cross. A genetic study may still miss the separation.`);if(finished)setText('story',`All ${s.loci} SNPs are fixed at generation ${number(g)}. Change the seed to explore another history.`);renderSnps();plotFst();plotPower();}
 function renderSnps(){
   const aggregate=s.loci>100; // Above 100 markers, render only aggregate counts.
   const onlyVariable=!aggregate&&$('segregating-only').checked; // The individual-marker filter never filters the summary.
@@ -107,14 +107,14 @@ function plotFst(){
   }
   c.svg+=`<polyline points="${history.map(d=>c.x(d.t)+','+c.y(d.fst)).join(' ')}" fill="none" stroke="#26938d" stroke-width="2.4"/><circle cx="${c.x(pop.generation)}" cy="${c.y(history.at(-1).fst)}" r="3" fill="#1c7877"/></svg>`;
   $('fst-chart').innerHTML=c.svg;
-  const latest=samples.at(-1),range=latest?`95% sampled FST range at generation ${latest.t}: ${latest.sampleFstLow.toFixed(4)} to ${latest.sampleFstHigh.toFixed(4)}`:`The 95% sampled FST range appears after the first ${number(s.studies)} study samples.`;
+  const latest=samples.at(-1),range=latest?`95% sampled FST range at generation ${latest.t}: ${latest.sampleFstLow.toFixed(4)} to ${latest.sampleFstHigh.toFixed(4)}`:`The 95% sampled FST range appears after the first ${number(s.studies)} simulated datasets.`;
   $('fst-chart').setAttribute('aria-label',`True differentiation at generation ${pop.generation}: FST ${history.at(-1).fst.toFixed(4)}. ${range}`);
   $('fst-interval').textContent=range;
 }
 function plotPower(){
   const points=power?.points||[],result=PowerResult.summary(power),max=Math.max(10,Math.ceil(pop.generation/10)*10);
   const crossing=result.status==='reached'?result.generation:null;
-  const c=baseChart(max,1,`Detection power · ${number(s.studies)} samples of the live pair`,{percent:true,...(hasRun?{greyEnd:crossing??pop.generation}:{})});
+  const c=baseChart(max,1,`Detection power · ${number(s.studies)} simulated datasets`,{percent:true,...(hasRun?{greyEnd:crossing??pop.generation}:{})});
   c.svg+=`<line x1="${c.l}" x2="${c.r}" y1="${c.y(.8)}" y2="${c.y(.8)}" stroke="#b68a51" stroke-dasharray="4 4"/>`;
   const visible=points.filter(p=>p.t<=pop.generation);
   if(visible.length)c.svg+=`<polyline points="${visible.map(d=>c.x(d.t)+','+c.y(d.power)).join(' ')}" fill="none" stroke="#436a80" stroke-width="2.1"/>`;
@@ -122,8 +122,11 @@ function plotPower(){
   $('power-chart').innerHTML=c.svg+'</svg>';
   $('power-chart').setAttribute('aria-label',`Live detection power through generation ${power?.max??0}; 80% guide.`);
   const checked=visible.at(-1);
-  if(checked)valueLine('power-now',['Generation ',number(checked.t),': ',number(checked.hits),' / ',number(s.studies),' studies detect differentiation (',(checked.power*100).toFixed(1),'%).']);
-  else valueLine('power-now',[!hasRun?'Press Run simulation to begin.':`Starting the ${number(s.studies)} study samples…`]);
+  setText('scene-power',checked?(checked.power*100).toFixed(1)+'%':'—');
+  $('scene-power').setAttribute('title',checked?`Latest completed estimate: generation ${number(checked.t)} · ${number(s.studies)} simulated datasets`:'Detection power has not been calculated yet.');
+  $('scene-power').setAttribute('aria-label',checked?`Detection power ${(checked.power*100).toFixed(1)} percent at generation ${number(checked.t)}`:'Detection power not calculated');
+  if(checked)valueLine('power-now',['Generation ',number(checked.t),': ',number(checked.hits),' / ',number(s.studies),' simulated datasets detect differentiation (',(checked.power*100).toFixed(1),'%).']);
+  else valueLine('power-now',[!hasRun?'Press Run simulation to begin.':`Starting the ${number(s.studies)} simulated datasets…`]);
   showPowerResult();
 }
 function showPowerResult(){
@@ -141,12 +144,12 @@ function showPowerResult(){
     meaning=`The current sequence started at generation ${number(result.generation)}. Five consecutive generations at or above 80% are required. A dip below 80% restarts the count.`;
   }else{
     title='Not reached yet';short='Not reached yet';status=`Live generation ${number(pop.generation)}`;
-    meaning=finished?'All SNPs are fixed. This history did not complete five consecutive generations at ≥80% detection power.':checked?`No five-generation sequence at ≥80% power has been confirmed yet. Latest estimate: ${Math.round(100*checked.power)}% at generation ${number(checked.t)}.`:`Drawing ${number(s.studies)} study samples from the current populations. The generation number will appear here once power stays at or above 80% for five consecutive generations.`;
+    meaning=finished?'All SNPs are fixed. This history did not complete five consecutive generations at ≥80% detection power.':checked?`No five-generation sequence at ≥80% power has been confirmed yet. Latest estimate: ${Math.round(100*checked.power)}% at generation ${number(checked.t)}.`:`Drawing ${number(s.studies)} simulated datasets from the current populations. The generation number will appear here once power stays at or above 80% for five consecutive generations.`;
   }
   setText('power-time',title);setText('power-meaning',meaning);setText('power-scene-time',short);setText('power-status',status);
   if(!hasRun)valueLine('power-progress',['READY']);
-  else valueLine('power-progress',['',finished?'FIXED':paused?(stepPowerTarget===null?'PAUSED':'STEPPING'):'RUNNING',' · generation ',number(pop.generation),' · ',number(s.studies),' study samples']);
-  setText('power-note',`${number(s.studies)} study samples of this live population pair · Generation playback waits for each power estimate. FST and genetics continue after the confirmed five-generation sequence.`);
+  else valueLine('power-progress',['',finished?'FIXED':paused?(stepPowerTarget===null?'PAUSED':'STEPPING'):'RUNNING',' · generation ',number(pop.generation),' · ',number(s.studies),' simulated datasets']);
+  setText('power-note',`${number(s.studies)} simulated datasets of this live population pair · Generation playback waits for each power estimate. FST and genetics continue after the confirmed five-generation sequence.`);
   setText('calculate-power',finished?'Run again':hasRun?(paused?'Resume simulation':'Pause simulation'):'Run simulation');
 }
 // Stable fixation may need up to four further study generations to confirm a pending streak.
