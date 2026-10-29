@@ -20,13 +20,10 @@ test('whales glide with forward momentum after completing their vertical strokes
   for(const stroke of [0,2,5])assert.equal(C.field({stroke,bend:0},'whale').at(1,0).y,0,'Straight swimming has no fish-like lateral tail wag');
 });
 
-test('head-first surfacing, breathing and diving share one continuous paused-clock timeline',()=>{
-  const {world}=fixture(),C=world.CetaceanCharacter,a={phase:0};
-  assert(C.appearance(a,1.5).opacity(.19)>C.appearance(a,1.5).opacity(.8));
-  assert(C.appearance(a,19).opacity(.19)<C.appearance(a,19).opacity(.8),'The back follows the head below the surface');
-  for(let t=0;t<58;t+=.1){const v=C.appearance(a,t);assert(v.length>.96&&v.length<=1);for(const u of [0,.2,.7,1])assert(v.opacity(u)>=.2&&v.opacity(u)<=1);if(v.breath>=0)assert(v.opacity(.19)>.99,'A blow must never happen underwater');}
-  assert.equal(C.appearance(a,30).breath,-1);assert.equal(C.appearance(a,30).opacity(.4),.2);
-  assert(Math.abs(C.appearance(a,57.9999).opacity(.4)-C.appearance(a,58.0001).opacity(.4))<1e-6);
+test('breathing remains intermittent and uses the paused ocean clock',()=>{
+  const {world}=fixture(),C=world.CetaceanCharacter,a={phase:0};let blowing=0,quiet=0;
+  for(let t=0;t<58;t+=.1){const v=C.appearance(a,t);if(v.breath>=0){assert(v.breath<=1);blowing++;}else quiet++;}
+  assert(blowing>0&&quiet>blowing);assert(C.appearance(a,3).breath>=0);assert.equal(C.appearance(a,30).breath,-1);
   assert.equal(JSON.stringify(C.appearance(a,8.5)),JSON.stringify(C.appearance(a,8.5)));
 });
 
@@ -49,16 +46,15 @@ for(const width of [370,940])test(`whales explore both basins with broad turns a
   assert.equal(visits[0].size,12);assert.equal(visits[1].size,12);
 });
 
-test('full and cached whales share depth opacity without multiplying cached poses',()=>{
+test('full and cached whales remain fully visible at the surface throughout breathing cycles',()=>{
   const {world}=fixture();world.Image=class{constructor(){this.complete=true;this.naturalWidth=2152;}};
   vm.runInContext(fs.readFileSync(path.join(__dirname,'../animation/cetacean-character.js'),'utf8'),world);
   const stack=[],alphas=[],gradient={addColorStop(){}},ctx=new Proxy({globalAlpha:1,save(){stack.push(this.globalAlpha);},restore(){assert(stack.length);this.globalAlpha=stack.pop();},drawImage(){alphas.push(this.globalAlpha);},createLinearGradient:()=>gradient,createRadialGradient:()=>gradient},{get:(o,k)=>k in o?o[k]:(()=>{})});
   const animal={x:100,y:100,heading:.3,scale:.7,phase:0,stroke:2,bend:.1},cache=new world.AnimalPoseCache();
-  for(const [time,opacity]of [[6,1],[30,.2]]){
+  for(const time of [0,1.5,6,19,30,60,120]){
     alphas.length=0;world.CetaceanCharacter.draw(ctx,animal,time,{variant:'whale'});
-    assert(alphas.length===36);assert(alphas.every(x=>Math.abs(x-opacity)<1e-10));assert.equal(stack.length,0);assert.equal(ctx.globalAlpha,1);
+    assert(alphas.length===36);assert(alphas.every(x=>x===1));assert.equal(stack.length,0);assert.equal(ctx.globalAlpha,1);
     alphas.length=0;cache.draw(ctx,animal,time,{variant:'whale'});
-    assert(alphas.length===1);assert(alphas.every(x=>Math.abs(x-opacity)<1e-10));assert.equal(stack.length,0);assert.equal(ctx.globalAlpha,1);assert.equal(cache.images.size,1);
+    assert(alphas.length===1);assert(alphas.every(x=>x===1));assert.equal(stack.length,0);assert.equal(ctx.globalAlpha,1);assert.equal(cache.images.size,1);
   }
-  alphas.length=0;cache.draw(ctx,animal,1.5,{variant:'whale'});assert.equal(alphas.length,18);assert(Math.max(...alphas)>Math.min(...alphas));assert.equal(cache.images.size,1);assert.equal(stack.length,0);
 });

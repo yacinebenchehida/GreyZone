@@ -410,7 +410,7 @@ test('invalid imports preserve the active run and seed validation cannot corrupt
   assert.equal(a.element('random-seed').value,seed);assert.match(a.element('settings-message').textContent,/whole-number/);
 });
 
-test('both Pause buttons freeze whale propulsion, glide and surfacing clocks in full and cached rendering',()=>{
+test('both Pause buttons freeze whale propulsion, glide and breathing clocks in full and cached rendering',()=>{
   for(const detail of ['full','lite']){
     const a=app({total:20,'shark-design':'whale'});a.scene.detail=detail;a.tick(2);a.click('split');a.tick(25);
     for(const button of ['play','calculate-power']){

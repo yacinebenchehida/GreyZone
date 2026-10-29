@@ -4,15 +4,12 @@
 'use strict';
 const TAU=Math.PI*2,clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
 const smooth=x=>{x=clamp(x);return x*x*(3-2*x);};
-// Compressed dive cycles keep representatives visible underwater. The head
-// breaks the surface before the back; blows occur only in that surface window.
+// Whales remain fully visible at the surface. Only their breathing is timed,
+// with independent offsets so they do not all blow together.
 function appearance(a,time){
   const period=58+(a.phase||0)*1.7,t=((time+(a.phase||0)*9)%period+period)%period;
-  const presence=u=>smooth((t-u*1.15)/1.6)*(1-smooth((t-17-u*1.8)/2.7));
   const breath=[2.5,8.2,13.9].find(start=>t>=start&&t<start+1.9);
-  const arch=Math.sin(Math.PI*clamp((t-16.5)/5.3));
-  return {t,breath:breath===undefined?-1:(t-breath)/1.9,
-    opacity:u=>.20+.80*presence(u),length:1-.035*arch,shallow:presence(.3)};
+  return {t,breath:breath===undefined?-1:(t-breath)/1.9};
 }
 // Three complete vertical strokes ease into a glide. Forward momentum decays
 // gradually, rather than stopping when the tail rests. This affects whales only.
@@ -49,15 +46,15 @@ function textured(){
   return Boolean(texture&&texture.complete&&texture.naturalWidth);
 }
 function drawTexture(c,a,time,options){
-  const {at,basis,stretch}=field(a,'whale'),view=appearance(a,time),sourceLeft=47,sourceWidth=2052,k=211/sourceWidth,strips=36;
-  c.save();c.translate(a.x,a.y);c.rotate(a.heading||0);c.scale((a.scale||1)*(options.skipDepth?1:view.length),a.scale||1);
+  const {at,basis,stretch}=field(a,'whale'),sourceLeft=47,sourceWidth=2052,k=211/sourceWidth,strips=36;
+  c.save();c.translate(a.x,a.y);c.rotate(a.heading||0);c.scale(a.scale||1,a.scale||1);
   // Bend the detailed skin along the same spine as the fins, flukes and genotype markers.
   for(let i=0;i<strips;i++){
     const sx=sourceLeft+i*sourceWidth/strips,sw=sourceWidth/strips,x=-121+(i+.5)*211/strips,u=(90-x)/180,p=basis(u);
-    c.save();c.globalAlpha=(c.globalAlpha??1)*(options.skipDepth?1:view.opacity(u));c.translate(p.x,p.y);c.rotate(p.a);c.scale(stretch(u),1);
+    c.save();c.translate(p.x,p.y);c.rotate(p.a);c.scale(stretch(u),1);
     c.drawImage(texture,sx,0,sw+1,731,-211/strips/2,-365.5*k,211/strips+k,731*k);c.restore();
   }
-  if(options.snps){c.globalAlpha=(c.globalAlpha??1)*Math.max(.55,view.opacity(.4));const n=Math.min(10,options.snps.length),cols=Math.min(5,n);for(let i=0;i<n;i++){const p=at(cols===1?.4:.25+(i%cols)/(cols-1)*.35,n>5?(i<5?-5.5:5.5):0);SharkCharacter.drawMarker(c,p.x,p.y,4.3,options.snps[i],options.snpPalettes?.[i]);}}
+  if(options.snps){const n=Math.min(10,options.snps.length),cols=Math.min(5,n);for(let i=0;i<n;i++){const p=at(cols===1?.4:.25+(i%cols)/(cols-1)*.35,n>5?(i<5?-5.5:5.5):0);SharkCharacter.drawMarker(c,p.x,p.y,4.3,options.snps[i],options.snpPalettes?.[i]);}}
   c.restore();
 }
 function field(a,kind){
@@ -83,7 +80,6 @@ function draw(c,a,time,options){
   if(options.variant==='whale'&&textured()){drawTexture(c,a,time,options);return;}
   const whale=options.variant==='whale',{phase,basis,at}=field(a,options.variant);
   c.save();c.translate(a.x,a.y);c.rotate(a.heading||0);c.scale(a.scale||1,a.scale||1);c.lineJoin='round';
-  if(whale&&!options.skipDepth){const view=appearance(a,time);c.globalAlpha=(c.globalAlpha??1)*view.opacity(.4);c.scale(view.length,1);}
   // Fin-whale pectorals are short and narrow, swept back along the streamlined torso.
   for(const sign of [-1,1]){
     const p=basis(whale?.29:.32);c.save();c.translate(p.x,p.y);c.rotate(p.a+sign*Math.sin(phase-.4)*.035);c.scale(1,sign);
@@ -135,15 +131,15 @@ function surface(c,a,time,kind){
   const cycle=(time+(a.phase||0)*7)%15,duration=.65;
   const q=whale?view.breath:cycle/duration;
   const heading=a.heading||0,scale=a.scale||1;
-  if(whale&&view.shallow>.05){
-    // A restrained bow ripple and wake accompany the surface passage only.
-    c.save();c.translate(a.x,a.y);c.rotate(heading);c.scale(scale*view.length,scale);
-    c.strokeStyle=`rgba(225,253,245,${view.shallow*.25})`;c.lineWidth=.8;
+  if(whale){
+    // A restrained bow ripple accompanies swimming at the surface.
+    c.save();c.translate(a.x,a.y);c.rotate(heading);c.scale(scale,scale);
+    c.strokeStyle='rgba(225,253,245,.25)';c.lineWidth=.8;
     for(const sign of [-1,1]){const p=at(.19,sign*6);c.beginPath();c.moveTo(p.x+8,p.y);c.bezierCurveTo(p.x-4,p.y+sign*8,p.x-27,p.y+sign*15,p.x-58,p.y+sign*17);c.stroke();}
     c.restore();
   }
   if(q<0||q>1)return;
-  const p=at(whale?.19:.13);p.x*=whale?view.length:1;
+  const p=at(whale?.19:.13);
   const x=a.x+(Math.cos(heading)*p.x-Math.sin(heading)*p.y)*scale,y=a.y+(Math.sin(heading)*p.x+Math.cos(heading)*p.y)*scale;
   c.save();c.translate(x,y);c.scale(scale,scale);
   c.strokeStyle=`rgba(232,253,247,${(1-q)*.35})`;c.lineWidth=.9;c.beginPath();c.ellipse(0,0,5+q*18,2.5+q*8,heading,0,TAU);c.stroke();
@@ -167,22 +163,5 @@ function surface(c,a,time,kind){
   }
   c.restore();
 }
-// Cached bodies retain the same depth sequence without caching hundreds of
-// depth variants. Longitudinal bands reveal the head before the dorsal region.
-function cached(c,image,a,time){
-  const view=appearance(a,time),bands=18,sw=image.width/bands;
-  c.save();c.scale(view.length,1);
-  // Most frames are a level glide, either surfaced or submerged. Only the
-  // short transitions need bands, keeping lightweight whale rendering cheap.
-  if(view.opacity(-.22)===view.opacity(1.22)){
-    c.globalAlpha=(c.globalAlpha??1)*view.opacity(.4);c.drawImage(image,-128,-80,256,160);c.restore();return;
-  }
-  for(let i=0;i<bands;i++){
-    const x=-128+(i+.5)*256/bands,u=(90-x)/180;
-    c.save();c.globalAlpha=(c.globalAlpha??1)*view.opacity(u);
-    c.drawImage(image,i*sw,0,sw,image.height,-128+i*256/bands,-80,256/bands,160);c.restore();
-  }
-  c.restore();
-}
-root.CetaceanCharacter={draw,field,surface,textured,appearance,propel,steer,avoid,cached};
+root.CetaceanCharacter={draw,field,surface,textured,appearance,propel,steer,avoid};
 })(globalThis);

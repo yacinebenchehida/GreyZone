@@ -20,13 +20,13 @@ class AnimalPoseCache{
       image=document.createElement('canvas');image.width=128;image.height=80;
       const paint=image.getContext('2d');if(!paint)return false;
       paint.setTransform(.5,0,0,.5,64,40);
-      SeaLife.draw(paint,{...pose,x:0,y:0,heading:0,scale:1},0,{variant:kind,skipWake:true,skipDepth:true});
+      SeaLife.draw(paint,{...pose,x:0,y:0,heading:0,scale:1},0,{variant:kind,skipWake:true});
       this.images.set(pose.key,image);
     }
     c.save();c.translate(animal.x,animal.y);c.rotate(animal.heading||0);c.scale(animal.scale||1,animal.scale||1);
-    if(kind==='whale')CetaceanCharacter.cached(c,image,animal,time);else c.drawImage(image,-128,-80,256,160);
+    c.drawImage(image,-128,-80,256,160);
     if(kind==='whale'||kind==='porpoise'){c.restore();CetaceanCharacter.surface(c,animal,time,kind);c.save();c.translate(animal.x,animal.y);c.rotate(animal.heading||0);c.scale(animal.scale||1,animal.scale||1);}
-    if(options.snps){if(kind==='whale'){const view=CetaceanCharacter.appearance(animal,time);c.globalAlpha=(c.globalAlpha??1)*Math.max(.55,view.opacity(.4));c.scale(view.length,1);}SeaLife.drawMarkers(c,pose,options);}
+    if(options.snps)SeaLife.drawMarkers(c,pose,options);
     c.restore();return true;
   }
 }
